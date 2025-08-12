@@ -22,7 +22,7 @@ interface FormData {
 
 export default function Home() {
   const [solutions, setSolutions] = useState<Solution[]>([])
-  const [desiredStats, setDesiredStats] = useState<FormData>({
+  const [desiredStats, setDesiredStats] = useState<Record<string, number>>({
     Health: 150,
     Melee: 75,
     Grenade: 75,
@@ -34,7 +34,7 @@ export default function Home() {
 
   const handleSubmit = async (data: FormData) => {
     setIsLoading(true)
-    setDesiredStats(data)
+    setDesiredStats(data as unknown as Record<string, number>)
     setSolutions([]) // Clear previous results
 
     try {

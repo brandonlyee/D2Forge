@@ -31,19 +31,6 @@ const STAT_NAMES = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"]
 
 export function SolutionDisplay({ solutions, desiredStats, isLoading = false }: SolutionDisplayProps) {
 
-  const formatPieceDescription = (pieceKey: string, count: number): string => {
-    try {
-      const piece: PieceType = JSON.parse(pieceKey)
-      const tuningText = piece.tuned_stat && piece.siphon_from 
-        ? ` tuned->${piece.tuned_stat} siphon_from=${piece.siphon_from}`
-        : ' No Tuning'
-      
-      return `${count}x ${piece.arch} (tertiary=${piece.tertiary}) mod+10->${piece.mod_target}${tuningText}`
-    } catch {
-      return `${count}x ${pieceKey}`
-    }
-  }
-
 
   if (isLoading) {
     return (
@@ -82,7 +69,7 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false }: 
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Try adjusting your desired stats or check if they're within possible limits.
+            Try adjusting your desired stats or check if they&apos;re within possible limits.
           </p>
         </CardContent>
       </Card>
@@ -144,7 +131,7 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false }: 
                                   Mod: +10 <StatIcon stat={piece.mod_target} size={14} /> {piece.mod_target}
                                 </span>
                               </div>
-                              {!isNonTuned && (
+                              {!isNonTuned && piece.tuned_stat && piece.siphon_from && (
                                 <div className="text-sm text-orange-600 flex items-center gap-2">
                                   <span className="flex items-center gap-1">
                                     Tuned: +5 <StatIcon stat={piece.tuned_stat} size={14} /> {piece.tuned_stat}
