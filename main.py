@@ -108,25 +108,46 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
         raise RuntimeError("pulp not installed; can't run MILP")
 
     solutions = []
+    deviations = []
 
     # Pre-check: all identical piece solution
     identical_sol = identical_piece_check(desired_totals, piece_types, piece_stats)
     if identical_sol:
         solutions.append(identical_sol)
+        deviations.append(0.0)
 
     exclusions = []
-    while len(solutions) < max_solutions:
+
+    def solve_problem(allow_deviation=False):
         prob = pulp.LpProblem("DestinyArmor3", pulp.LpMinimize)
         x_vars = {p: pulp.LpVariable(f"x_{i}", lowBound=0, upBound=5, cat="Integer")
                   for i, p in enumerate(piece_types)}
 
+        if allow_deviation:
+            # Add positive and negative deviation variables for each stat
+            dev_pos = {s: pulp.LpVariable(f"dev_pos_{s}", lowBound=0) for s in STAT_NAMES}
+            dev_neg = {s: pulp.LpVariable(f"dev_neg_{s}", lowBound=0) for s in STAT_NAMES}
+
         # core constraints
         prob += pulp.lpSum(x_vars[p] for p in piece_types) == 5
-        for si in range(6):
-            prob += pulp.lpSum(x_vars[p] * piece_stats[p][si] for p in piece_types) == desired_totals[si]
 
-        # objective: minimize farm difficulty
-        prob += pulp.lpSum(x_vars[p] * (10 if p.tuned_stat is None else 0) for p in piece_types) * -1
+        for si, stat in enumerate(STAT_NAMES):
+            stat_sum = pulp.lpSum(x_vars[p] * piece_stats[p][si] for p in piece_types)
+            if allow_deviation:
+                # Allow deviation: actual = desired + positive_dev - negative_dev
+                prob += stat_sum - desired_totals[si] == dev_pos[stat] - dev_neg[stat]
+            else:
+                # Exact constraint
+                prob += stat_sum == desired_totals[si]
+
+        if allow_deviation:
+            # Minimize total deviation with small farming difficulty tiebreaker
+            deviation_cost = pulp.lpSum(dev_pos[s] + dev_neg[s] for s in STAT_NAMES)
+            farm_cost = pulp.lpSum(x_vars[p] * (10 if p.tuned_stat is None else 0) for p in piece_types) * -0.01
+            prob += deviation_cost + farm_cost
+        else:
+            # Minimize farm difficulty
+            prob += pulp.lpSum(x_vars[p] * (10 if p.tuned_stat is None else 0) for p in piece_types) * -1
 
         # exclusion constraints from prior solutions
         for excl in exclusions:
@@ -135,26 +156,90 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
         prob.solve()
 
         if pulp.LpStatus[prob.status] != "Optimal":
-            break
+            return None, None
 
         sol = {p: int(round(x_vars[p].value())) for p in piece_types if x_vars[p].value() > 0.5}
-        norm_sol = normalize_solution(sol)
-        if norm_sol not in solutions:
-            solutions.append(norm_sol)
+        
+        if allow_deviation:
+            dev_total = sum(dev_pos[s].value() + dev_neg[s].value() for s in STAT_NAMES)
+        else:
+            dev_total = 0.0
+
+        return normalize_solution(sol), dev_total
+
+    # Phase 1: Try to find exact solutions
+    while len(solutions) < max_solutions:
+        sol, dev = solve_problem(allow_deviation=False)
+        if not sol:
+            break
+        if sol not in solutions:
+            solutions.append(sol)
+            deviations.append(dev)
         exclusions.append(list(sol.keys()))
 
-    # Sort all found solutions by farmability
-    solutions.sort(key=difficulty_score)
-    return solutions
+    # Phase 2: If no exact solutions found, try approximate solutions
+    if not solutions:
+        print("No exact match found - trying closest match.")
+        exclusions = []  # Reset exclusions for approximate search
+        while len(solutions) < max_solutions:
+            sol, dev = solve_problem(allow_deviation=True)
+            if not sol:
+                break
+            if sol not in solutions:
+                solutions.append(sol)
+                deviations.append(dev)
+            exclusions.append(list(sol.keys()))
+
+    # Sort all found solutions by farmability, then by deviation
+    combined = list(zip(solutions, deviations))
+    combined.sort(key=lambda x: (difficulty_score(x[0]), x[1]))
+    solutions, deviations = zip(*combined) if combined else ([], [])
+
+    return list(solutions), list(deviations)
 
 
-def format_solution(sol):
+def calculate_actual_stats(sol, piece_stats):
+    """Calculate the actual stat distribution achieved by a solution."""
+    actual_stats = [0] * 6
+    for piece, count in sol.items():
+        piece_stat_array = piece_stats[piece]
+        for stat_idx in range(6):
+            actual_stats[stat_idx] += piece_stat_array[stat_idx] * count
+    return actual_stats
+
+
+def format_solution(sol, deviation=0.0, desired_stats=None, piece_stats=None):
     lines = []
     for p, count in sol.items():
         if p.tuned_stat is None:
             lines.append(f"{count}x {p.arch} (tertiary={p.tertiary}) mod+10->{p.mod_target} No Tuning")
         else:
             lines.append(f"{count}x {p.arch} (tertiary={p.tertiary}) mod+10->{p.mod_target} tuned->{p.tuned_stat} siphon_from={p.siphon_from}")
+    
+    if deviation > 0:
+        lines.append(f"\nTotal deviation from desired stats: {deviation:.1f}")
+        
+        # Show stat distribution comparison if we have the data
+        if desired_stats is not None and piece_stats is not None:
+            actual_stats = calculate_actual_stats(sol, piece_stats)
+            lines.append("\nStat Distribution:")
+            lines.append("Stat      | Actual | Desired | Difference")
+            lines.append("----------|--------|---------|----------")
+            
+            for stat_idx, stat_name in enumerate(STAT_NAMES):
+                actual = actual_stats[stat_idx]
+                desired = desired_stats[stat_idx]
+                diff = actual - desired
+                lines.append(f"{stat_name:<9} | {actual:6} | {desired:7} | {diff:+6}")
+            
+            actual_total = sum(actual_stats)
+            desired_total = sum(desired_stats)
+            diff_total = actual_total - desired_total
+            lines.append("----------|--------|---------|----------")
+            lines.append(f"{'Total':<9} | {actual_total:6} | {desired_total:7} | {diff_total:+6}")
+    else:
+        lines.append("\nExact match")
+    
     return "\n".join(lines)
 
 
@@ -172,10 +257,10 @@ if __name__ == "__main__":
     piece_types, piece_stats = generate_piece_types()
     print(f"Generated {len(piece_types)} piece configurations.")
 
-    sols = solve_with_milp_multiple(desired_vec, piece_types, piece_stats, max_solutions=5)
+    sols, devs = solve_with_milp_multiple(desired_vec, piece_types, piece_stats, max_solutions=5)
     if not sols:
         print("No solutions found.")
     else:
-        for i, s in enumerate(sols, 1):
+        for i, (s, d) in enumerate(zip(sols, devs), 1):
             print(f"\nSolution {i}:")
-            print(format_solution(s))
+            print(format_solution(s, d, desired_vec, piece_stats))
