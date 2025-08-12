@@ -4,8 +4,7 @@ import React from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Copy, CheckCircle, AlertTriangle } from 'lucide-react'
+import { CheckCircle, AlertTriangle } from 'lucide-react'
 import { StatIcon } from '@/components/stat-icon'
 
 interface PieceType {
@@ -31,17 +30,6 @@ interface SolutionDisplayProps {
 const STAT_NAMES = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"]
 
 export function SolutionDisplay({ solutions, desiredStats, isLoading = false }: SolutionDisplayProps) {
-  const [copiedIndex, setCopiedIndex] = React.useState<number | null>(null)
-
-  const copyToClipboard = async (text: string, index: number) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopiedIndex(index)
-      setTimeout(() => setCopiedIndex(null), 2000)
-    } catch (err) {
-      console.error('Failed to copy text: ', err)
-    }
-  }
 
   const formatPieceDescription = (pieceKey: string, count: number): string => {
     try {
@@ -56,17 +44,6 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false }: 
     }
   }
 
-  const getSolutionText = (solution: Solution, index: number): string => {
-    const pieces = Object.entries(solution.pieces)
-      .map(([pieceKey, count]) => formatPieceDescription(pieceKey, count))
-      .join('\n')
-    
-    const statusText = solution.deviation > 0 
-      ? `\nTotal deviation from desired stats: ${solution.deviation.toFixed(1)}`
-      : '\nExact match'
-    
-    return `Solution ${index + 1}:\n${pieces}${statusText}`
-  }
 
   if (isLoading) {
     return (
@@ -129,30 +106,16 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false }: 
       {solutions.map((solution, index) => (
         <Card key={index}>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">
-                Solution {index + 1}
-                {solution.deviation === 0 ? (
-                  <Badge className="ml-2" variant="default">Exact Match</Badge>
-                ) : (
-                  <Badge className="ml-2" variant="secondary">
-                    ~{solution.deviation.toFixed(1)} deviation
-                  </Badge>
-                )}
-              </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copyToClipboard(getSolutionText(solution, index), index)}
-                suppressHydrationWarning
-              >
-                {copiedIndex === index ? (
-                  <CheckCircle className="h-4 w-4" suppressHydrationWarning />
-                ) : (
-                  <Copy className="h-4 w-4" suppressHydrationWarning />
-                )}
-              </Button>
-            </div>
+            <CardTitle className="text-lg">
+              Solution {index + 1}
+              {solution.deviation === 0 ? (
+                <Badge className="ml-2" variant="default">Exact Match</Badge>
+              ) : (
+                <Badge className="ml-2" variant="secondary">
+                  ~{solution.deviation.toFixed(1)} deviation
+                </Badge>
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
