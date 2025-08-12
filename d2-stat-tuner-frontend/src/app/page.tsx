@@ -4,6 +4,8 @@ import React, { useState } from 'react'
 import { StatInputForm } from '@/components/stat-input-form'
 import { SolutionDisplay } from '@/components/solution-display'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { OptimizationProgress } from '@/components/optimization-progress'
+import { useOptimizationWorker } from '@/hooks/useOptimizationWorker'
 
 interface Solution {
   pieces: Record<string, number>
@@ -30,34 +32,26 @@ export default function Home() {
     Class: 75,
     Weapons: 25,
   })
-  const [isLoading, setIsLoading] = useState(false)
+  
+  // Use the client-side optimization worker
+  const { optimize, progress, isLoading, error, stats } = useOptimizationWorker()
 
   const handleSubmit = async (data: FormData) => {
-    setIsLoading(true)
-    setDesiredStats(data as unknown as Record<string, number>)
+    const statsData = data as unknown as Record<string, number>
+    setDesiredStats(statsData)
     setSolutions([]) // Clear previous results
 
     try {
-      // Call our API route which will eventually call the Python backend
-      const response = await fetch('/api/optimize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
+      // Use client-side optimization
+      const result = await optimize({
+        desired_stats: statsData,
+        max_solutions: 5
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to optimize stats')
-      }
-
-      const result = await response.json()
+      
       setSolutions(result.solutions || [])
     } catch (error) {
       console.error('Error optimizing stats:', error)
       setSolutions([])
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -89,7 +83,14 @@ export default function Home() {
             </div>
 
             {/* Solutions Display */}
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-3 space-y-6">
+              {/* Show progress when optimizing */}
+              <OptimizationProgress 
+                progress={progress}
+                stats={stats}
+                isLoading={isLoading}
+              />
+              
               <SolutionDisplay 
                 solutions={solutions} 
                 desiredStats={desiredStats}
@@ -101,8 +102,9 @@ export default function Home() {
           {/* Footer */}
           <footer className="text-center text-sm text-muted-foreground border-t pt-8">
             <p>
-              Built with Next.js, shadcn/ui, and Python. 
-              Optimizes 1944 possible armor configurations using PuLP MILP solver.
+              Built with Next.js, TypeScript, and Web Workers. 
+              Client-side optimization of 1944 armor configurations using Mixed Integer Linear Programming.
+              {stats && ` • ${stats.total_pieces.toLocaleString()} configurations loaded`}
             </p>
           </footer>
         </div>
