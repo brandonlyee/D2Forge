@@ -181,7 +181,7 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
     if not solutions:
         print("No exact match found - trying closest match.")
         exclusions = []  # Reset exclusions for approximate search
-        while len(solutions) < 3:
+        while len(solutions) < 1:
             sol, dev = solve_problem(allow_deviation=True)
             if not sol:
                 break
