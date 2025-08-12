@@ -41,7 +41,7 @@ Each armor piece has 2 mod slots:
 ## Strategic Implications
 * Stats requiring 40+ per piece (200+ total) MUST use specific archetypes
 * Extreme distributions often require coordinated tuning across multiple pieces
-* Some distributions are impossible (e.g., any stat over 225 total)
+* Some distributions are impossible (e.g., any single stat over 200 total)
 * Tuning is critical for achieving 0 in a stat or maximizing beyond standard limits
 
 This system creates a complex optimization puzzle where achieving specific stat distributions requires careful selection of archetypes, tertiary stats, mods, and tuning configurations.

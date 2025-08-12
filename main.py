@@ -246,12 +246,12 @@ def format_solution(sol, deviation=0.0, desired_stats=None, piece_stats=None):
 # Example usage
 if __name__ == "__main__":
     desired = {
-        "Health": 150,
-        "Melee": 75,
-        "Grenade": 75,
-        "Super": 100,
-        "Class": 75,
-        "Weapons": 25
+        "Health": 0,
+        "Melee": 170,
+        "Grenade": 130,
+        "Super": 25,
+        "Class": 25,
+        "Weapons": 150
     }
     desired_vec = [desired[s] for s in STAT_NAMES]
     piece_types, piece_stats = generate_piece_types()
