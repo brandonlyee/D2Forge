@@ -18,20 +18,76 @@ import { StatIcon } from '@/components/stat-icon'
 
 const STAT_NAMES = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"] as const
 
-// Available exotic class item perk combinations from the Python backend
-const EXOTIC_PERK_COMBINATIONS = [
-  ["Spirit of Inmost Light", "Spirit of Synthoceps"],
-  ["Spirit of Inmost Light", "Spirit of Cyrtarachne"], 
-  ["Spirit of Caliban", "Spirit of the Liar"]
+// Map each Perk 1 to its available Perk 2 options (from main.py CLASS_ITEM_ROLLS)
+const EXOTIC_PERK_MAPPING = {
+  "Spirit of the Assassin": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity"],
+  "Spirit of Inmost Light": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of Cyrtarachne", "Spirit of the Gyrfalcon", "Spirit of the Wormhusk", "Spirit of the Coyote"],
+  "Spirit of the Dragon": ["Spirit of the Star-Eater", "Spirit of the Coyote"],
+  "Spirit of the Foe Tracer": ["Spirit of the Star-Eater"],
+  "Spirit of Caliban": ["Spirit of Synthoceps", "Spirit of Cyrtarachne", "Spirit of the Liar"],
+  "Spirit of Renewal": ["Spirit of Cyrtarachne", "Spirit of the Coyote"],
+  "Spirit of Severance": ["Spirit of Synthoceps"],
+  "Spirit of the Eternal Warrior": ["Spirit of the Star-Eater", "Spirit of Synthoceps"],
+  "Spirit of the Abeyant": ["Spirit of Synthoceps"],
+  "Spirit of the Bear": ["Spirit of Synthoceps"],
+  "Spirit of the Stag": ["Spirit of Synthoceps"],
+  "Spirit of the Necrotic": ["Spirit of the Star-Eater", "Spirit of Synthoceps"],
+  "Spirit of Osmiomancy": ["Spirit of Verity"],
+  "Spirit of Apotheosis": ["Spirit of Synthoceps"]
+} as const
+
+// Complete list of all possible Perk 1 options (including those with no valid combinations yet)
+const ALL_POSSIBLE_PERK1_OPTIONS = [
+  "Spirit of the Assassin",
+  "Spirit of Inmost Light", 
+  "Spirit of the Ophidian",
+  "Spirit of the Dragon",
+  "Spirit of Galanor",
+  "Spirit of the Foe Tracer",
+  "Spirit of Caliban",
+  "Spirit of Renewal",
+  "Spirit of Severance",
+  "Spirit of Hoarfrost",
+  "Spirit of the Eternal Warrior",
+  "Spirit of the Abeyant",
+  "Spirit of the Bear",
+  "Spirit of the Stag",
+  "Spirit of the Filaments",
+  "Spirit of the Necrotic",
+  "Spirit of Osmiomancy",
+  "Spirit of Apotheosis"
 ] as const
 
-const AVAILABLE_PERKS = [
-  "Spirit of Inmost Light",
-  "Spirit of Synthoceps", 
+// Complete list of all possible Perk 2 options (including those with no valid combinations yet)
+const ALL_POSSIBLE_PERK2_OPTIONS = [
+  "Spirit of the Star-Eater",
+  "Spirit of Synthoceps",
+  "Spirit of Verity",
   "Spirit of Cyrtarachne",
-  "Spirit of Caliban",
-  "Spirit of the Liar"
+  "Spirit of the Gyrfalcon",
+  "Spirit of the Liar",
+  "Spirit of the Wormhusk",
+  "Spirit of the Coyote",
+  "Spirit of Contact",
+  "Spirit of Scars",
+  "Spirit of the Horn",
+  "Spirit of the Alpha Lupi",
+  "Spirit of the Armamentarium",
+  "Spirit of the Vesper",
+  "Spirit of the Harmony",
+  "Spirit of the Swarm",
+  "Spirit of the Claw",
+  "Spirit of Starfire"
 ] as const
+
+// Reverse mapping for when Perk 2 is selected first
+const PERK2_TO_PERK1_MAPPING = Object.entries(EXOTIC_PERK_MAPPING).reduce((acc, [perk1, perk2s]) => {
+  perk2s.forEach(perk2 => {
+    if (!acc[perk2]) acc[perk2] = []
+    acc[perk2].push(perk1)
+  })
+  return acc
+}, {} as Record<string, string[]>)
 
 const formSchema = z.object({
   Health: z.number().min(0).max(225),
@@ -45,6 +101,15 @@ const formSchema = z.object({
   use_class_item_exotic: z.boolean(),
   exotic_perk1: z.string().optional(),
   exotic_perk2: z.string().optional(),
+}).refine((data) => {
+  // If using exotic class item, both perks must be selected
+  if (data.use_exotic && data.use_class_item_exotic) {
+    return data.exotic_perk1 && data.exotic_perk2
+  }
+  return true
+}, {
+  message: "Both perks must be selected when using exotic class item",
+  path: ["exotic_perk1"] // This will show the error on the first perk field
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -81,10 +146,49 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
     if (!watchedValues.use_exotic || !watchedValues.use_class_item_exotic) return true
     if (!watchedValues.exotic_perk1 || !watchedValues.exotic_perk2) return true
     
-    return EXOTIC_PERK_COMBINATIONS.some(([perk1, perk2]) => 
-      (watchedValues.exotic_perk1 === perk1 && watchedValues.exotic_perk2 === perk2) ||
-      (watchedValues.exotic_perk1 === perk2 && watchedValues.exotic_perk2 === perk1)
-    )
+    const perk1 = watchedValues.exotic_perk1
+    const perk2 = watchedValues.exotic_perk2
+    
+    // Check if perk1 -> perk2 is valid
+    const perk1Options = EXOTIC_PERK_MAPPING[perk1 as keyof typeof EXOTIC_PERK_MAPPING]
+    if (perk1Options && (perk1Options as readonly string[]).includes(perk2)) {
+      return true
+    }
+    
+    // Check if perk2 -> perk1 is valid (reverse direction)
+    const perk2Options = EXOTIC_PERK_MAPPING[perk2 as keyof typeof EXOTIC_PERK_MAPPING]
+    if (perk2Options && (perk2Options as readonly string[]).includes(perk1)) {
+      return true
+    }
+    
+    return false
+  }
+  
+  // Get available perk1 options based on selected perk2
+  const getAvailablePerk1Options = () => {
+    // If no perk2 is selected, show all perk1 options
+    if (!watchedValues.exotic_perk2) return ALL_POSSIBLE_PERK1_OPTIONS
+    // If both are selected and valid, allow changing perk1 to any option
+    if (watchedValues.exotic_perk1 && isValidPerkCombination()) return ALL_POSSIBLE_PERK1_OPTIONS
+    // Otherwise, filter based on perk2
+    return PERK2_TO_PERK1_MAPPING[watchedValues.exotic_perk2] || []
+  }
+  
+  // Get available perk2 options based on selected perk1
+  const getAvailablePerk2Options = () => {
+    // If no perk1 is selected, show all perk2 options
+    if (!watchedValues.exotic_perk1) return ALL_POSSIBLE_PERK2_OPTIONS
+    // If both are selected and valid, allow changing perk2 to any option
+    if (watchedValues.exotic_perk2 && isValidPerkCombination()) return ALL_POSSIBLE_PERK2_OPTIONS
+    // Otherwise, filter based on perk1
+    const validOptions = EXOTIC_PERK_MAPPING[watchedValues.exotic_perk1 as keyof typeof EXOTIC_PERK_MAPPING]
+    return validOptions ? [...validOptions] : []
+  }
+  
+  // Check if perks are missing when exotic class item is enabled
+  const hasMissingPerks = () => {
+    if (!watchedValues.use_exotic || !watchedValues.use_class_item_exotic) return false
+    return !watchedValues.exotic_perk1 || !watchedValues.exotic_perk2
   }
 
   return (
@@ -231,7 +335,21 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
               {watchedValues.use_exotic && watchedValues.use_class_item_exotic && (
                 <div className="rounded-lg border p-4 space-y-4">
                   <div>
-                    <h4 className="text-base font-medium mb-2">Exotic Class Item Perks</h4>
+                    <h4 className="text-base font-medium mb-2 flex items-center gap-2">
+                      Exotic Class Item Perks
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="inline-flex">
+                              <Info className="h-4 w-4" suppressHydrationWarning />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Some Exotic Class Item perk combinations<br />are not available at this time, due to<br />uncertainty of their stat distributions.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </h4>
                     <p className="text-sm text-muted-foreground mb-4">
                       Select two perks for your exotic class item. Only certain combinations are available.
                     </p>
@@ -251,11 +369,21 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {AVAILABLE_PERKS.map((perk) => (
-                                <SelectItem key={perk} value={perk}>
-                                  {perk}
-                                </SelectItem>
-                              ))}
+                              {ALL_POSSIBLE_PERK1_OPTIONS.map((perk) => {
+                                const availableOptions = getAvailablePerk1Options()
+                                const isAvailable = (availableOptions as readonly string[]).includes(perk)
+                                const shouldDisable = Boolean(watchedValues.exotic_perk2 && !isAvailable && availableOptions.length < ALL_POSSIBLE_PERK1_OPTIONS.length)
+                                return (
+                                  <SelectItem 
+                                    key={perk} 
+                                    value={perk}
+                                    disabled={shouldDisable}
+                                    className={shouldDisable ? "opacity-50" : ""}
+                                  >
+                                    {perk}
+                                  </SelectItem>
+                                )
+                              })}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -276,11 +404,21 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {AVAILABLE_PERKS.map((perk) => (
-                                <SelectItem key={perk} value={perk}>
-                                  {perk}
-                                </SelectItem>
-                              ))}
+                              {ALL_POSSIBLE_PERK2_OPTIONS.map((perk) => {
+                                const availableOptions = getAvailablePerk2Options()
+                                const isAvailable = (availableOptions as readonly string[]).includes(perk)
+                                const shouldDisable = Boolean(watchedValues.exotic_perk1 && !isAvailable && availableOptions.length < ALL_POSSIBLE_PERK2_OPTIONS.length)
+                                return (
+                                  <SelectItem 
+                                    key={perk} 
+                                    value={perk}
+                                    disabled={shouldDisable}
+                                    className={shouldDisable ? "opacity-50" : ""}
+                                  >
+                                    {perk}
+                                  </SelectItem>
+                                )
+                              })}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -289,15 +427,21 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
                     />
                   </div>
                   
-                  {!isValidPerkCombination() && (
+                  {hasMissingPerks() && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-800">
+                        ⚠️ Please select both perks to use exotic class item
+                      </p>
+                    </div>
+                  )}
+                  
+                  {!isValidPerkCombination() && watchedValues.exotic_perk1 && watchedValues.exotic_perk2 && (
                     <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                       <p className="text-sm text-yellow-800">
-                        ⚠️ Invalid perk combination. Available combinations:
-                        <ul className="mt-1 ml-4 list-disc">
-                          {EXOTIC_PERK_COMBINATIONS.map(([perk1, perk2], idx) => (
-                            <li key={idx}>{perk1} + {perk2}</li>
-                          ))}
-                        </ul>
+                        ⚠️ Invalid perk combination: {watchedValues.exotic_perk1} + {watchedValues.exotic_perk2}
+                      </p>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        Try selecting one perk first to see available options for the second perk.
                       </p>
                     </div>
                   )}
@@ -340,7 +484,7 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={isLoading || (watchedValues.use_exotic && watchedValues.use_class_item_exotic && !isValidPerkCombination())}
+              disabled={isLoading || hasMissingPerks() || (watchedValues.use_exotic && watchedValues.use_class_item_exotic && !isValidPerkCombination())}
             >
               {isLoading ? (
                 <>
