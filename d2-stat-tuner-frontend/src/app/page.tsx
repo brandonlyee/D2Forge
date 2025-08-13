@@ -18,6 +18,7 @@ interface FormData {
   Super: number
   Class: number
   Weapons: number
+  allow_tuned: boolean
 }
 
 export default function Home() {
@@ -31,10 +32,14 @@ export default function Home() {
     Weapons: 25,
   })
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (data: FormData) => {
     setIsLoading(true)
-    setDesiredStats(data as unknown as Record<string, number>)
+    setError(null) // Clear previous errors
+    // Extract only the stat values for display, excluding allow_tuned
+    const { allow_tuned, ...statValues } = data
+    setDesiredStats(statValues)
     setSolutions([]) // Clear previous results
 
     try {
@@ -48,13 +53,15 @@ export default function Home() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to optimize stats')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to optimize stats')
       }
 
       const result = await response.json()
       setSolutions(result.solutions || [])
     } catch (error) {
       console.error('Error optimizing stats:', error)
+      setError(error instanceof Error ? error.message : 'An unexpected error occurred')
       setSolutions([])
     } finally {
       setIsLoading(false)
@@ -94,6 +101,7 @@ export default function Home() {
                 solutions={solutions} 
                 desiredStats={desiredStats}
                 isLoading={isLoading}
+                error={error}
               />
             </div>
           </div>
@@ -102,7 +110,7 @@ export default function Home() {
           <footer className="text-center text-sm text-muted-foreground border-t pt-8">
             <p>
               Built with Next.js, shadcn/ui, and Python. 
-              Optimizes 1944 possible armor configurations using PuLP MILP solver.
+              Uses Mixed Integer Linear Programming (MILP) to find optimal armor builds.
             </p>
           </footer>
         </div>

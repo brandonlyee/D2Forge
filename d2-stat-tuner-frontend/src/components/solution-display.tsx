@@ -10,6 +10,7 @@ import { StatIcon } from '@/components/stat-icon'
 interface PieceType {
   arch: string
   tertiary: string
+  tuning_mode: string // "none", "tuned", "balanced"
   mod_target: string
   tuned_stat?: string | null
   siphon_from?: string | null
@@ -25,12 +26,33 @@ interface SolutionDisplayProps {
   solutions: Solution[]
   desiredStats: Record<string, number>
   isLoading?: boolean
+  error?: string | null
 }
 
 const STAT_NAMES = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"]
 
-export function SolutionDisplay({ solutions, desiredStats, isLoading = false }: SolutionDisplayProps) {
-
+export function SolutionDisplay({ solutions, desiredStats, isLoading = false, error = null }: SolutionDisplayProps) {
+  
+  if (error) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-red-500" suppressHydrationWarning />
+            Error
+          </CardTitle>
+          <CardDescription>
+            Failed to optimize armor configurations
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-red-600">
+            {error}
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   if (isLoading) {
     return (
@@ -46,7 +68,7 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false }: 
             <div className="text-center space-y-4">
               <div className="animate-spin text-4xl">⚙️</div>
               <p className="text-muted-foreground">
-                Analyzing 1944 possible armor configurations...
+                Analyzing armor configurations...
               </p>
             </div>
           </div>
@@ -113,7 +135,18 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false }: 
                   {Object.entries(solution.pieces).map(([pieceKey, count], pieceIndex) => {
                     try {
                       const piece: PieceType = JSON.parse(pieceKey)
-                      const isNonTuned = !piece.tuned_stat || !piece.siphon_from
+                      
+                      const getBadgeVariant = () => {
+                        if (piece.tuning_mode === "balanced") return "default"
+                        if (piece.tuning_mode === "tuned") return "secondary" 
+                        return "outline"
+                      }
+                      
+                      const getBadgeText = () => {
+                        if (piece.tuning_mode === "balanced") return "Balanced"
+                        if (piece.tuning_mode === "tuned") return `${piece.tuned_stat} Tuning` || "Tuned"
+                        return "No Tuning"
+                      }
                       
                       return (
                         <div key={pieceIndex} className="p-3 border rounded-lg">
@@ -121,7 +154,7 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false }: 
                             <div>
                               <div className="font-medium flex items-center gap-2">
                                 <StatIcon stat={piece.arch} size={20} />
-                                {count}x {piece.arch} Armor
+                                {count} x {piece.arch} Armor
                               </div>
                               <div className="text-sm text-muted-foreground flex items-center gap-4">
                                 <span className="flex items-center gap-1">
@@ -131,19 +164,25 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false }: 
                                   Mod: +10 <StatIcon stat={piece.mod_target} size={14} /> {piece.mod_target}
                                 </span>
                               </div>
-                              {!isNonTuned && piece.tuned_stat && piece.siphon_from && (
+                              {piece.tuning_mode === "tuned" && piece.tuned_stat && piece.siphon_from && (
                                 <div className="text-sm text-orange-600 flex items-center gap-2">
                                   <span className="flex items-center gap-1">
                                     Tuned: +5 <StatIcon stat={piece.tuned_stat} size={14} /> {piece.tuned_stat}
                                   </span>
+                                  <span>/</span>
                                   <span className="flex items-center gap-1">
                                     -5 <StatIcon stat={piece.siphon_from} size={14} /> {piece.siphon_from}
                                   </span>
                                 </div>
                               )}
+                              {piece.tuning_mode === "balanced" && (
+                                <div className="text-sm text-blue-600">
+                                  Balanced Tuning: +1 to 3 lowest stats
+                                </div>
+                              )}
                             </div>
-                            <Badge variant={isNonTuned ? "default" : "secondary"}>
-                              {isNonTuned ? "No Tuning" : "Tuned"}
+                            <Badge variant={getBadgeVariant()}>
+                              {getBadgeText()}
                             </Badge>
                           </div>
                         </div>
@@ -151,11 +190,40 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false }: 
                     } catch {
                       return (
                         <div key={pieceIndex} className="p-3 border rounded-lg">
-                          <div className="font-medium">{count}x Unknown Piece</div>
+                          <div className="font-medium">{count} x Unknown Piece</div>
                         </div>
                       )
                     }
                   })}
+                </div>
+              </div>
+              
+              {/* Mods Section */}
+              <div>
+                <h4 className="font-medium mb-3">Mods:</h4>
+                <div className="space-y-2">
+                  {(() => {
+                    const modCounts: Record<string, number> = {}
+                    
+                    Object.entries(solution.pieces).forEach(([pieceKey, count]) => {
+                      try {
+                        const piece: PieceType = JSON.parse(pieceKey)
+                        modCounts[piece.mod_target] = (modCounts[piece.mod_target] || 0) + count
+                      } catch {
+                        // Handle malformed piece data
+                      }
+                    })
+                    
+                    return Object.entries(modCounts).map(([stat, count], index) => (
+                      <div key={index} className="p-2 border rounded-lg bg-muted/50">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{count} x +10</span>
+                          <StatIcon stat={stat} size={16} />
+                          <span className="font-medium">{stat}</span>
+                        </div>
+                      </div>
+                    ))
+                  })()}
                 </div>
               </div>
 
