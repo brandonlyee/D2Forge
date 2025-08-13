@@ -48,11 +48,14 @@ PieceType = namedtuple(
 # Piece generation (now supports Balanced Tuning correctly)
 # ----------------------------
 
-def generate_piece_types():
+def generate_piece_types(allow_tuned=True):
     """Generate all armor piece configurations including:
     - no tuning
-    - +5/-5 reallocation tuning
+    - +5/-5 reallocation tuning (if allow_tuned=True)
     - Balanced Tuning (+1 to the three lowest *base* stats, independent of +10 mod)
+
+    Args:
+        allow_tuned: If False, excludes +5/-5 tuning pieces to reduce farming difficulty
 
     Notes:
     * For reallocation tuning, we allow siphoning FROM ANY stat with at least 5 points
@@ -94,22 +97,23 @@ def generate_piece_types():
                 piece_types.append(p_none)
                 piece_stats[p_none] = tuple(mod_applied)
 
-                # (B) +5/-5 tuning (reallocation)
-                # Allow ANY donor with value >= 5 after mod (includes prim/sec/tert if eligible)
-                donor_candidates = [s for s in STAT_NAMES if mod_applied[STAT_IDX[s]] >= TUNING_VAL]
-                for tuned in STAT_NAMES:
-                    for donor in donor_candidates:
-                        if donor == tuned:
-                            continue
-                        stats_after = mod_applied.copy()
-                        stats_after[STAT_IDX[donor]] -= TUNING_VAL
-                        stats_after[STAT_IDX[tuned]] += TUNING_VAL
-                        # Validate bounds per piece
-                        if any((v < 0 or v > MAX_PER_PIECE) for v in stats_after):
-                            continue
-                        p_tuned = PieceType(arch.name, tert, "tuned", tuned, donor, mod_target)
-                        piece_types.append(p_tuned)
-                        piece_stats[p_tuned] = tuple(stats_after)
+                # (B) +5/-5 tuning (reallocation) - only if allowed
+                if allow_tuned:
+                    # Allow ANY donor with value >= 5 after mod (includes prim/sec/tert if eligible)
+                    donor_candidates = [s for s in STAT_NAMES if mod_applied[STAT_IDX[s]] >= TUNING_VAL]
+                    for tuned in STAT_NAMES:
+                        for donor in donor_candidates:
+                            if donor == tuned:
+                                continue
+                            stats_after = mod_applied.copy()
+                            stats_after[STAT_IDX[donor]] -= TUNING_VAL
+                            stats_after[STAT_IDX[tuned]] += TUNING_VAL
+                            # Validate bounds per piece
+                            if any((v < 0 or v > MAX_PER_PIECE) for v in stats_after):
+                                continue
+                            p_tuned = PieceType(arch.name, tert, "tuned", tuned, donor, mod_target)
+                            piece_types.append(p_tuned)
+                            piece_stats[p_tuned] = tuple(stats_after)
 
                 # (C) Balanced Tuning: +1 to the three lowest *base* stats
                 stats_bal = mod_applied.copy()
@@ -156,7 +160,7 @@ def identical_piece_check(desired_totals, piece_types, piece_stats):
 # MILP solver (exact + approximate)
 # ----------------------------
 
-def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solutions=5):
+def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solutions=5, allow_tuned=True):
     if not HAS_PULP:
         raise RuntimeError("pulp not installed; can't run MILP")
 
@@ -267,17 +271,22 @@ def calculate_actual_stats(sol, piece_stats):
 def format_solution(sol, deviation=0.0, desired_stats=None, piece_stats=None):
     armor_lines = []
     mods = defaultdict(int)  # group +10 mods by stat only (hidden from piece lines)
-
+    
+    # Group identical pieces by their string representation for display
+    piece_groups = defaultdict(int)
     for p, count in sol.items():
         if p.tuning_mode == "balanced":
-            armor_lines.append(f"{count}x {p.arch} (tertiary={p.tertiary}) Balanced Tuning (+1 to 3 lowest stats)")
+            key = f"{p.arch} (tertiary={p.tertiary}) (tuning=ANY) Balanced Tuning (+1 to 3 lowest stats)"
         elif p.tuning_mode == "tuned":
-            armor_lines.append(
-                f"{count}x {p.arch} (tertiary={p.tertiary}) tuned->{p.tuned_stat} siphon_from={p.siphon_from}"
-            )
+            key = f"{p.arch} (tertiary={p.tertiary}) (tuning={p.tuned_stat}) +{p.tuned_stat}/-{p.siphon_from}"
         else:
-            armor_lines.append(f"{count}x {p.arch} (tertiary={p.tertiary}) No Tuning")
+            key = f"{p.arch} (tertiary={p.tertiary}) (tuning=ANY) No Tuning"
+        piece_groups[key] += count
         mods[p.mod_target] += count
+    
+    # Create armor lines from grouped pieces
+    for piece_desc, total_count in piece_groups.items():
+        armor_lines.append(f"{total_count}x {piece_desc}")
 
     lines = []
     lines.extend(armor_lines)
@@ -310,20 +319,27 @@ if __name__ == "__main__":
     desired = {
         "Health": 160,
         "Melee": 155,
-        "Grenade": 25,
+        "Grenade": 30,
         "Super": 110,
-        "Class": 25,
-        "Weapons": 25,
+        "Class": 30,
+        "Weapons": 30,
     }
     desired_vec = [desired[s] for s in STAT_NAMES]
 
-    piece_types, piece_stats = generate_piece_types()
-    print(f"Generated {len(piece_types)} piece configurations.")
+    # Test both with and without +5/-5 tuning
+    for allow_tuned in [True, False]:
+        tuning_mode = "with +5/-5 tuning" if allow_tuned else "without +5/-5 tuning"
+        print(f"\n{'='*60}")
+        print(f"Testing {tuning_mode}")
+        print(f"{'='*60}")
+        
+        piece_types, piece_stats = generate_piece_types(allow_tuned=allow_tuned)
+        print(f"Generated {len(piece_types)} piece configurations.")
 
-    sols, devs = solve_with_milp_multiple(desired_vec, piece_types, piece_stats, max_solutions=5)
-    if not sols:
-        print("No solutions found.")
-    else:
-        for i, (s, d) in enumerate(zip(sols, devs), 1):
-            print(f"\nSolution {i}:")
-            print(format_solution(s, d, desired_vec, piece_stats))
+        sols, devs = solve_with_milp_multiple(desired_vec, piece_types, piece_stats, max_solutions=5, allow_tuned=allow_tuned)
+        if not sols:
+            print("No solutions found.")
+        else:
+            for i, (s, d) in enumerate(zip(sols, devs), 1):
+                print(f"\nSolution {i}:")
+                print(format_solution(s, d, desired_vec, piece_stats))
