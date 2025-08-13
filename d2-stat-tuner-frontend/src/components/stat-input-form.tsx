@@ -10,17 +10,21 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Info } from 'lucide-react'
 import { StatIcon } from '@/components/stat-icon'
 
 const STAT_NAMES = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"] as const
 
 const formSchema = z.object({
-  Health: z.number().min(0).max(500),
-  Melee: z.number().min(0).max(500),
-  Grenade: z.number().min(0).max(500),
-  Super: z.number().min(0).max(500),
-  Class: z.number().min(0).max(500),
-  Weapons: z.number().min(0).max(500),
+  Health: z.number().min(0).max(225),
+  Melee: z.number().min(0).max(225),
+  Grenade: z.number().min(0).max(225),
+  Super: z.number().min(0).max(225),
+  Class: z.number().min(0).max(225),
+  Weapons: z.number().min(0).max(225),
+  allow_tuned: z.boolean(),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -40,12 +44,13 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
       Super: 100,
       Class: 75,
       Weapons: 25,
+      allow_tuned: true,
     },
   })
 
   const watchedValues = form.watch()
-  const totalStats = Object.values(watchedValues).reduce((sum, value) => sum + (value || 0), 0)
-  const maxPossibleStats = 500 // 5 pieces * 90 max per piece
+  const totalStats = STAT_NAMES.reduce((sum, statName) => sum + (watchedValues[statName] || 0), 0)
+  const maxPossibleStats = 515 // 5 pieces * 103 max per piece (with balanced tuning)
 
   return (
     <Card className="w-full max-w-2xl">
@@ -53,6 +58,18 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
         <CardTitle className="flex items-center gap-2">
           <span className="text-2xl">⚔️</span>
           Destiny 2 Stat Optimizer
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" className="inline-flex">
+                  <Info className="h-4 w-4" suppressHydrationWarning />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p>Currently, we are not accounting for stat modifications from Subclass Fragments, or Fonts.<br />Please input your desired stats accordingly.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </CardTitle>
         <CardDescription>
           Enter your desired stat distribution. The optimizer will find the best armor combinations.
@@ -79,7 +96,7 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
                             <Input
                               type="number"
                               min={0}
-                              max={500}
+                              max={225}
                               className="w-20"
                               {...field}
                               onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
@@ -88,7 +105,7 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
                               <Slider
                                 value={[field.value || 0]}
                                 onValueChange={(values) => field.onChange(values[0])}
-                                max={500}
+                                max={225}
                                 min={0}
                                 step={5}
                                 className="w-full"
@@ -104,6 +121,31 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
               ))}
             </div>
 
+            <div className="border-t pt-4">
+              <FormField
+                control={form.control}
+                name="allow_tuned"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base font-medium">
+                        Allow +5/-5 Tuning Mods
+                      </FormLabel>
+                      <div className="text-sm text-muted-foreground">
+                        Include armor pieces with +5/-5 stat tuning. These are harder to farm but provide more optimization options.
+                      </div>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">Total Stats:</span>
@@ -111,8 +153,20 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
                   {totalStats}
                 </Badge>
               </div>
-              <div className="text-sm text-muted-foreground">
-                Max Possible: {maxPossibleStats}
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <span>Max Possible: {maxPossibleStats}</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="inline-flex">
+                        <Info className="h-3 w-3" suppressHydrationWarning />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-sm">
+                      <p>Assuming all Tier 5 armor, five +10 Stat mods,<br />and five Balanced Tuning mods, 515 is the<br />maximum amount of stats that can be<br />provided by a set of armor.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
 

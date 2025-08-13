@@ -25,10 +25,12 @@ class StatRequest(BaseModel):
     Super: int
     Class: int
     Weapons: int
+    allow_tuned: bool = True  # Default to allowing +5/-5 tuning for backward compatibility
 
 class PieceInfo(BaseModel):
     arch: str
     tertiary: str
+    tuning_mode: str  # "none", "tuned", "balanced"
     mod_target: str
     tuned_stat: Optional[str] = None
     siphon_from: Optional[str] = None
@@ -64,10 +66,10 @@ async def optimize_stats(request: StatRequest):
         ]
         
         # Generate piece types and their stats (this might take a moment on first run)
-        piece_types, piece_stats = generate_piece_types()
+        piece_types, piece_stats = generate_piece_types(allow_tuned=request.allow_tuned)
         
         # Run the optimization
-        solutions_list, deviations_list = solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solutions=5)
+        solutions_list, deviations_list = solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solutions=5, allow_tuned=request.allow_tuned)
         
         if not solutions_list:
             return OptimizeResponse(
@@ -86,6 +88,7 @@ async def optimize_stats(request: StatRequest):
                 piece_dict = {
                     'arch': piece_type.arch,
                     'tertiary': piece_type.tertiary,
+                    'tuning_mode': piece_type.tuning_mode,
                     'mod_target': piece_type.mod_target,
                     'tuned_stat': piece_type.tuned_stat,
                     'siphon_from': piece_type.siphon_from
