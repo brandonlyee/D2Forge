@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 import json
 
 # Import the existing optimization functions
-from main import solve_with_milp_multiple, generate_piece_types, STAT_NAMES, calculate_actual_stats
+from main import solve_with_milp_multiple, generate_piece_types, STAT_NAMES, calculate_actual_stats, CLASS_ITEM_ROLLS
 
 app = FastAPI(title="D2 Stat Tuner API", version="1.0.0")
 
@@ -26,6 +26,9 @@ class StatRequest(BaseModel):
     Class: int
     Weapons: int
     allow_tuned: bool = True  # Default to allowing +5/-5 tuning for backward compatibility
+    use_exotic: bool = False  # Default to no exotic armor
+    use_class_item_exotic: bool = False  # Default to regular exotic if exotic is enabled
+    exotic_perks: Optional[List[str]] = None  # List of 2 perk names for exotic class item
 
 class PieceInfo(BaseModel):
     arch: str
@@ -65,11 +68,38 @@ async def optimize_stats(request: StatRequest):
             request.Weapons
         ]
         
-        # Generate piece types and their stats (this might take a moment on first run)
-        piece_types, piece_stats = generate_piece_types(allow_tuned=request.allow_tuned)
+        # Validate exotic perk combination if using exotic class item
+        exotic_perks_tuple = None
+        if request.use_exotic and request.use_class_item_exotic:
+            if not request.exotic_perks or len(request.exotic_perks) != 2:
+                raise HTTPException(status_code=400, detail="exotic_perks must be a list of exactly 2 perk names when using exotic class item")
+            
+            exotic_perks_tuple = tuple(request.exotic_perks)
+            if exotic_perks_tuple not in CLASS_ITEM_ROLLS:
+                available_combinations = list(CLASS_ITEM_ROLLS.keys())
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Invalid exotic perk combination: {exotic_perks_tuple}. Available combinations: {available_combinations}"
+                )
         
-        # Run the optimization
-        solutions_list, deviations_list = solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solutions=5, allow_tuned=request.allow_tuned)
+        # Generate piece types and their stats (this might take a moment on first run)
+        piece_types, piece_stats = generate_piece_types(
+            allow_tuned=request.allow_tuned,
+            use_exotic=request.use_exotic,
+            use_class_item_exotic=request.use_class_item_exotic,
+            exotic_perks=exotic_perks_tuple
+        )
+        
+        # Run the optimization with 2-minute total timeout
+        solutions_list, deviations_list = solve_with_milp_multiple(
+            desired_totals, 
+            piece_types, 
+            piece_stats, 
+            max_solutions=5, 
+            allow_tuned=request.allow_tuned,
+            require_exotic=request.use_exotic,
+            total_timeout=30  # 30 seconds for approximations
+        )
         
         if not solutions_list:
             return OptimizeResponse(
@@ -117,8 +147,17 @@ async def get_stats_info():
     """Get information about the stat system"""
     return {
         "stat_names": STAT_NAMES,
-        "max_possible_total": 500,  # 5 pieces * 90 max per piece  
+        "max_possible_total": 515,  # 5 pieces * 103 max per piece (with balanced tuning)  
         "description": "Destiny 2 has 6 stats that can be optimized through armor selection and modding"
+    }
+
+@app.get("/exotic/perks")
+async def get_exotic_perks():
+    """Get available exotic class item perk combinations"""
+    return {
+        "available_combinations": list(CLASS_ITEM_ROLLS.keys()),
+        "class_item_rolls": CLASS_ITEM_ROLLS,
+        "description": "Available perk combinations for exotic class items"
     }
 
 if __name__ == "__main__":
