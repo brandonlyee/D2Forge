@@ -16,7 +16,7 @@ Archetype = namedtuple("Archetype", ["name", "primary_stat", "secondary_stat"])
 ARCHETYPES = [
     Archetype("Brawler", "Melee", "Health"),
     Archetype("Bulwark", "Health", "Class"),
-    Archetype("Grenadier", "Grenade", "Weapons"),
+    Archetype("Grenadier", "Grenade", "Super"),
     Archetype("Paragon", "Super", "Melee"),
     Archetype("Gunner", "Weapons", "Grenade"),
     Archetype("Specialist", "Class", "Weapons"),
@@ -234,7 +234,7 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
     # Phase 2: approximate solutions if none found
     if not solutions:
         exclusions = []  # reset exclusions
-        while len(solutions) < max_solutions:
+        while len(solutions) < 3: # approximate solutions take long, only produce 3
             sol, dev = solve_problem(allow_deviation=True)
             if not sol:
                 break
