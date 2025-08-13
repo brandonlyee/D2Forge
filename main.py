@@ -147,7 +147,7 @@ def generate_piece_types(allow_tuned=True, *, use_exotic=False, use_class_item_e
                 piece_types.append(p_none)
                 piece_stats[p_none] = tuple(mod_applied)
         else:
-            # Normal exotic pool (all archetypes/tertiaries), 'none' mode only
+            # Generate exotic alternatives for each archetype (no tuning for exotics)
             for arch in ARCHETYPES:
                 prim = arch.primary_stat
                 sec = arch.secondary_stat
@@ -203,10 +203,13 @@ def identical_piece_check(desired_totals, piece_types, piece_stats):
 # ----------------------------
 
 def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solutions=5, allow_tuned=True,
-                             require_exotic=False):
+                             require_exotic=False, total_timeout=120):
     if not HAS_PULP:
         raise RuntimeError("pulp not installed; can't run MILP")
 
+    import time
+    start_time = time.time()
+    
     solutions = []
     deviations = []
 
@@ -219,7 +222,13 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
 
     exclusions = []
 
-    def solve_problem(allow_deviation=False):
+    def solve_problem(allow_deviation=False, use_timeout=False):
+        if use_timeout:
+            # Calculate remaining time for this solver call
+            elapsed = time.time() - start_time
+            remaining_time = max(10, total_timeout - elapsed)  # At least 10 seconds per call
+        else:
+            remaining_time = None  # No timeout for exact solutions
         prob = pulp.LpProblem("DestinyArmor3", pulp.LpMinimize)
         x = {p: pulp.LpVariable(f"x_{i}", lowBound=0, upBound=5, cat="Integer")
              for i, p in enumerate(piece_types)}
@@ -259,8 +268,11 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
         for excl in exclusions:
             prob += pulp.lpSum(x[p] for p in excl) <= 4
 
-        prob.solve()
-        if pulp.LpStatus[prob.status] != "Optimal":
+        if remaining_time is not None:
+            prob.solve(pulp.PULP_CBC_CMD(msg=True, timeLimit=remaining_time))
+        else:
+            prob.solve(pulp.PULP_CBC_CMD(msg=True))  # No timeout
+        if pulp.LpStatus[prob.status] not in ["Optimal", "Not Solved"]:
             return None, None
 
         sol = {p: int(round(x[p].value())) for p in piece_types if x[p].value() and x[p].value() > 0.5}
@@ -269,7 +281,7 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
             dev_total = sum((dev_pos[s].value() or 0) + (dev_neg[s].value() or 0) for s in STAT_NAMES)
         return normalize_solution(sol), dev_total
 
-    # Phase 1: find exact solutions
+    # Phase 1: find exact solutions (no timeout)
     while len(solutions) < max_solutions:
         sol, dev = solve_problem(allow_deviation=False)
         if not sol:
@@ -279,11 +291,17 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
             deviations.append(dev)
         exclusions.append(list(sol.keys()))
 
-    # Phase 2: approximations if needed
+    # Phase 2: approximations if needed (with timeout)
     if not solutions:
         exclusions = []
+        # Reset start time for Phase 2 timeout
+        start_time = time.time()
         while len(solutions) < min(3, max_solutions):
-            sol, dev = solve_problem(allow_deviation=True)
+            # Check if we've exceeded total timeout
+            if time.time() - start_time >= total_timeout:
+                break
+                
+            sol, dev = solve_problem(allow_deviation=True, use_timeout=True)
             if not sol:
                 break
             if sol not in solutions:
@@ -368,12 +386,12 @@ def format_solution(sol, deviation=0.0, desired_stats=None, piece_stats=None):
 # ----------------------------
 if __name__ == "__main__":
     desired = {
-        "Health": 30,
-        "Melee": 70,
+        "Health": 25,
+        "Melee": 90,
         "Grenade": 180,
-        "Super": 120,
-        "Class": 70,
-        "Weapons": 30,
+        "Super": 100,
+        "Class": 80,
+        "Weapons": 25,
     }
     desired_vec = [desired[s] for s in STAT_NAMES]
 
@@ -406,7 +424,8 @@ if __name__ == "__main__":
         piece_stats,
         max_solutions=5,
         allow_tuned=allow_tuned,
-        require_exotic=use_exotic
+        require_exotic=use_exotic,
+        total_timeout=30  # 30 second timeout for Phase 2 only
     )
     if not sols:
         print("No solutions found.")

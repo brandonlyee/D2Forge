@@ -19,6 +19,10 @@ interface FormData {
   Class: number
   Weapons: number
   allow_tuned: boolean
+  use_exotic: boolean
+  use_class_item_exotic: boolean
+  exotic_perk1?: string
+  exotic_perk2?: string
 }
 
 export default function Home() {
@@ -37,19 +41,29 @@ export default function Home() {
   const handleSubmit = async (data: FormData) => {
     setIsLoading(true)
     setError(null) // Clear previous errors
-    // Extract only the stat values for display, excluding allow_tuned
-    const { allow_tuned, ...statValues } = data
+    // Extract only the stat values for display, excluding optimization options
+    const { allow_tuned, use_exotic, use_class_item_exotic, exotic_perk1, exotic_perk2, ...statValues } = data
     setDesiredStats(statValues)
     setSolutions([]) // Clear previous results
 
     try {
+      // Prepare exotic perks array for backend
+      const exotic_perks = (use_exotic && use_class_item_exotic && exotic_perk1 && exotic_perk2) 
+        ? [exotic_perk1, exotic_perk2] 
+        : undefined
+
+      const requestData = {
+        ...data,
+        exotic_perks
+      }
+
       // Call our API route which will eventually call the Python backend
       const response = await fetch('/api/optimize', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(requestData),
       })
 
       if (!response.ok) {

@@ -132,52 +132,89 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
               <div>
                 <h4 className="font-medium mb-3">Armor Pieces:</h4>
                 <div className="space-y-2">
-                  {Object.entries(solution.pieces).map(([pieceKey, count], pieceIndex) => {
-                    try {
-                      const piece: PieceType = JSON.parse(pieceKey)
+                  {(() => {
+                    // Group pieces by everything except mod_target
+                    const groupedPieces: Record<string, { pieces: Array<{piece: PieceType, count: number}>, totalCount: number }> = {}
+                    
+                    Object.entries(solution.pieces).forEach(([pieceKey, count]) => {
+                      try {
+                        const piece: PieceType = JSON.parse(pieceKey)
+                        
+                        // Create grouping key without mod_target
+                        const groupKey = JSON.stringify({
+                          arch: piece.arch,
+                          tertiary: piece.tertiary,
+                          tuning_mode: piece.tuning_mode,
+                          tuned_stat: piece.tuned_stat,
+                          siphon_from: piece.siphon_from
+                        })
+                        
+                        if (!groupedPieces[groupKey]) {
+                          groupedPieces[groupKey] = { pieces: [], totalCount: 0 }
+                        }
+                        
+                        groupedPieces[groupKey].pieces.push({ piece, count })
+                        groupedPieces[groupKey].totalCount += count
+                      } catch {
+                        // Handle malformed pieces
+                      }
+                    })
+                    
+                    return Object.entries(groupedPieces).map(([groupKey, group], groupIndex) => {
+                      if (group.pieces.length === 0) return null
+                      
+                      const firstPiece = group.pieces[0].piece
+                      const isExotic = firstPiece.arch.toLowerCase().includes('exotic')
                       
                       const getBadgeVariant = () => {
-                        if (piece.tuning_mode === "balanced") return "default"
-                        if (piece.tuning_mode === "tuned") return "secondary" 
+                        if (isExotic) return "destructive"
+                        if (firstPiece.tuning_mode === "balanced") return "default"
+                        if (firstPiece.tuning_mode === "tuned") return "secondary" 
                         return "outline"
                       }
                       
                       const getBadgeText = () => {
-                        if (piece.tuning_mode === "balanced") return "Balanced"
-                        if (piece.tuning_mode === "tuned") return `${piece.tuned_stat} Tuning` || "Tuned"
+                        if (isExotic) return "Exotic"
+                        if (firstPiece.tuning_mode === "balanced") return "Balanced"
+                        if (firstPiece.tuning_mode === "tuned") return `${firstPiece.tuned_stat} Tuning` || "Tuned"
                         return "No Tuning"
                       }
                       
                       return (
-                        <div key={pieceIndex} className="p-3 border rounded-lg">
+                        <div key={groupIndex} className="p-3 border rounded-lg">
                           <div className="flex items-center justify-between">
                             <div>
                               <div className="font-medium flex items-center gap-2">
-                                <StatIcon stat={piece.arch} size={20} />
-                                {count} x {piece.arch} Armor
+                                {isExotic && <span className="text-orange-500">✨</span>}
+                                <StatIcon stat={firstPiece.arch.replace('Exotic ', '')} size={20} />
+                                {group.totalCount} x {firstPiece.arch} {isExotic ? '' : 'Armor'}
                               </div>
-                              <div className="text-sm text-muted-foreground flex items-center gap-4">
+                              <div className="text-sm text-muted-foreground">
                                 <span className="flex items-center gap-1">
-                                  Tertiary: <StatIcon stat={piece.tertiary} size={14} /> {piece.tertiary}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  Mod: +10 <StatIcon stat={piece.mod_target} size={14} /> {piece.mod_target}
+                                  Tertiary: <StatIcon stat={firstPiece.tertiary} size={14} /> {firstPiece.tertiary}
                                 </span>
                               </div>
-                              {piece.tuning_mode === "tuned" && piece.tuned_stat && piece.siphon_from && (
+                              {firstPiece.tuning_mode === "tuned" && firstPiece.tuned_stat && firstPiece.siphon_from && (
                                 <div className="text-sm text-orange-600 flex items-center gap-2">
                                   <span className="flex items-center gap-1">
-                                    Tuned: +5 <StatIcon stat={piece.tuned_stat} size={14} /> {piece.tuned_stat}
+                                    Tuned: +5 <StatIcon stat={firstPiece.tuned_stat} size={14} /> {firstPiece.tuned_stat}
                                   </span>
                                   <span>/</span>
                                   <span className="flex items-center gap-1">
-                                    -5 <StatIcon stat={piece.siphon_from} size={14} /> {piece.siphon_from}
+                                    -5 <StatIcon stat={firstPiece.siphon_from} size={14} /> {firstPiece.siphon_from}
                                   </span>
                                 </div>
                               )}
-                              {piece.tuning_mode === "balanced" && (
+                              {firstPiece.tuning_mode === "balanced" && (
                                 <div className="text-sm text-blue-600">
                                   Balanced Tuning: +1 to 3 lowest stats
+                                </div>
+                              )}
+                              {isExotic && (
+                                <div className="text-sm text-orange-600">
+                                  {firstPiece.arch.includes('Class Item') 
+                                    ? 'Exotic Class Item with fixed stat distribution'
+                                    : 'Exotic Armor: 30/20/13/5/5/5 base stats'}
                                 </div>
                               )}
                             </div>
@@ -187,14 +224,8 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                           </div>
                         </div>
                       )
-                    } catch {
-                      return (
-                        <div key={pieceIndex} className="p-3 border rounded-lg">
-                          <div className="font-medium">{count} x Unknown Piece</div>
-                        </div>
-                      )
-                    }
-                  })}
+                    }).filter(Boolean)
+                  })()}
                 </div>
               </div>
               
