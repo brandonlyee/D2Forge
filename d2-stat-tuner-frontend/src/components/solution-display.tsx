@@ -160,7 +160,7 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                       }
                     })
                     
-                    return Object.entries(groupedPieces).map(([groupKey, group], groupIndex) => {
+                    return Object.entries(groupedPieces).map(([, group], groupIndex) => {
                       if (group.pieces.length === 0) return null
                       
                       const firstPiece = group.pieces[0].piece
