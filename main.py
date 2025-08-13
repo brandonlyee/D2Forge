@@ -2,6 +2,7 @@ from collections import namedtuple, defaultdict
 
 try:
     import pulp
+
     HAS_PULP = True
 except ImportError:
     HAS_PULP = False
@@ -30,51 +31,60 @@ STANDARD_MOD_VAL = 10
 TUNING_VAL = 5
 MAX_PER_PIECE = PRIMARY_VAL + STANDARD_MOD_VAL + TUNING_VAL  # 45
 
+# Exotic-specific constants
+EXOTIC_SECONDARY_VAL = 20
+EXOTIC_TERTIARY_VAL = 13
+
 # tuning_mode: "none" | "tuned" | "balanced"
 PieceType = namedtuple(
     "PieceType",
     [
-        "arch",          # archetype name
-        "tertiary",      # tertiary stat name
-        "tuning_mode",   # none | tuned | balanced
-        "tuned_stat",    # if tuned: which stat receives +5
-        "siphon_from",   # if tuned: which stat gives -5
-        "mod_target",    # +10 standard mod target (kept for MILP math only)
+        "arch",  # archetype name
+        "tertiary",  # tertiary stat name
+        "tuning_mode",  # none | tuned | balanced
+        "tuned_stat",  # if tuned: which stat receives +5
+        "siphon_from",  # if tuned: which stat gives -5
+        "mod_target",  # +10 standard mod target (kept for MILP math only)
     ],
 )
+
+# Fixed rolls for Exotic Class Item (subset)
+# Map: (perk1, perk2) -> (primary, secondary, tertiary)
+CLASS_ITEM_ROLLS = {
+    ("Spirit of Inmost Light", "Spirit of Synthoceps"): ("Super", "Melee", "Health"),
+    ("Spirit of Inmost Light", "Spirit of Cyrtarachne"): ("Super", "Melee", "Grenade"),
+    ("Spirit of Caliban", "Spirit of the Liar"): ("Melee", "Grenade", "Class"),
+}
 
 
 # ----------------------------
 # Piece generation (now supports Balanced Tuning correctly)
 # ----------------------------
 
-def generate_piece_types(allow_tuned=True):
-    """Generate all armor piece configurations including:
-    - no tuning
-    - +5/-5 reallocation tuning (if allow_tuned=True)
-    - Balanced Tuning (+1 to the three lowest *base* stats, independent of +10 mod)
+def generate_piece_types(allow_tuned=True, *, use_exotic=False, use_class_item_exotic=False, exotic_perks=None):
+    """Generate all armor piece configurations.
 
-    Args:
-        allow_tuned: If False, excludes +5/-5 tuning pieces to reduce farming difficulty
-
-    Notes:
-    * For reallocation tuning, we allow siphoning FROM ANY stat with at least 5 points
-      after the +10 mod is applied (including primary/secondary/tertiary),
-      provided the result stays within [0, 45]. This matches examples like
-      "siphon_from=Health".
-    * Balanced Tuning ignores the +10 mod to determine "lowest" stats. In this 3.0 model,
-      those are exactly the three stats that are NOT primary/secondary/tertiary.
+    Normal armor:
+      - modes: none, tuned (if allow_tuned), balanced
+    Exotic (non-class-item):
+      - modes: none only (no tuning slot)
+      - exactly one may be used when solver is called with require_exotic=True
+      - stats: 30 / 20 / 13 / 5 / 5 / 5 (before +10)
+    Exotic Class Item:
+      - single fixed roll from CLASS_ITEM_ROLLS, modes: none only
+      - still has +10 mod slot
     """
     piece_types = []
     piece_stats = {}
 
+    # --- Normal piece generation (with Balanced Tuning) ---
     for arch in ARCHETYPES:
         prim = arch.primary_stat
         sec = arch.secondary_stat
         tert_choices = [s for s in STAT_NAMES if s not in (prim, sec)]
 
         for tert in tert_choices:
-            # Base distribution BEFORE +10 and BEFORE any tuning
+            # Base BEFORE +10 and BEFORE tuning
             base = [0] * 6
             base[STAT_IDX[prim]] = PRIMARY_VAL
             base[STAT_IDX[sec]] = SECONDARY_VAL
@@ -83,12 +93,10 @@ def generate_piece_types(allow_tuned=True):
                 if s not in (prim, sec, tert):
                     base[STAT_IDX[s]] = BASE_FIVE
 
-            # The three lowest base stats for Balanced Tuning are exactly the three
-            # that are neither prim/sec/tert.
+            # For Balanced Tuning, lowest three are non-prim/sec/tert
             balanced_low_indices = [STAT_IDX[s] for s in STAT_NAMES if s not in (prim, sec, tert)]
 
             for mod_target in STAT_NAMES:
-                # Apply +10 standard mod AFTER evaluating which stats Balanced boosts
                 mod_applied = base.copy()
                 mod_applied[STAT_IDX[mod_target]] += STANDARD_MOD_VAL
 
@@ -97,9 +105,8 @@ def generate_piece_types(allow_tuned=True):
                 piece_types.append(p_none)
                 piece_stats[p_none] = tuple(mod_applied)
 
-                # (B) +5/-5 tuning (reallocation) - only if allowed
+                # (B) +5/-5 tuning (if allowed)
                 if allow_tuned:
-                    # Allow ANY donor with value >= 5 after mod (includes prim/sec/tert if eligible)
                     donor_candidates = [s for s in STAT_NAMES if mod_applied[STAT_IDX[s]] >= TUNING_VAL]
                     for tuned in STAT_NAMES:
                         for donor in donor_candidates:
@@ -108,20 +115,55 @@ def generate_piece_types(allow_tuned=True):
                             stats_after = mod_applied.copy()
                             stats_after[STAT_IDX[donor]] -= TUNING_VAL
                             stats_after[STAT_IDX[tuned]] += TUNING_VAL
-                            # Validate bounds per piece
                             if any((v < 0 or v > MAX_PER_PIECE) for v in stats_after):
                                 continue
                             p_tuned = PieceType(arch.name, tert, "tuned", tuned, donor, mod_target)
                             piece_types.append(p_tuned)
                             piece_stats[p_tuned] = tuple(stats_after)
 
-                # (C) Balanced Tuning: +1 to the three lowest *base* stats
+                # (C) Balanced Tuning (+1 to three non-prim/sec/tert)
                 stats_bal = mod_applied.copy()
                 for idx in balanced_low_indices:
                     stats_bal[idx] += 1
                 p_bal = PieceType(arch.name, tert, "balanced", None, None, mod_target)
                 piece_types.append(p_bal)
                 piece_stats[p_bal] = tuple(stats_bal)
+
+    # --- Exotic generation ---
+    if use_exotic:
+        if use_class_item_exotic:
+            if exotic_perks not in CLASS_ITEM_ROLLS:
+                raise ValueError("exotic_perks must be a (perk1, perk2) tuple present in CLASS_ITEM_ROLLS")
+            prim, sec, tert = CLASS_ITEM_ROLLS[exotic_perks]
+            base = [BASE_FIVE] * 6
+            base[STAT_IDX[prim]] = PRIMARY_VAL
+            base[STAT_IDX[sec]] = EXOTIC_SECONDARY_VAL
+            base[STAT_IDX[tert]] = EXOTIC_TERTIARY_VAL
+            for mod_target in STAT_NAMES:
+                mod_applied = base.copy()
+                mod_applied[STAT_IDX[mod_target]] += STANDARD_MOD_VAL
+                label = f"Exotic Class Item ({exotic_perks[0]} + {exotic_perks[1]})"
+                p_none = PieceType(label, tert, "none", None, None, mod_target)
+                piece_types.append(p_none)
+                piece_stats[p_none] = tuple(mod_applied)
+        else:
+            # Normal exotic pool (all archetypes/tertiaries), 'none' mode only
+            for arch in ARCHETYPES:
+                prim = arch.primary_stat
+                sec = arch.secondary_stat
+                tert_choices = [s for s in STAT_NAMES if s not in (prim, sec)]
+                for tert in tert_choices:
+                    base = [BASE_FIVE] * 6
+                    base[STAT_IDX[prim]] = PRIMARY_VAL
+                    base[STAT_IDX[sec]] = EXOTIC_SECONDARY_VAL
+                    base[STAT_IDX[tert]] = EXOTIC_TERTIARY_VAL
+                    for mod_target in STAT_NAMES:
+                        mod_applied = base.copy()
+                        mod_applied[STAT_IDX[mod_target]] += STANDARD_MOD_VAL
+                        label = f"Exotic {arch.name}"
+                        p_none = PieceType(label, tert, "none", None, None, mod_target)
+                        piece_types.append(p_none)
+                        piece_stats[p_none] = tuple(mod_applied)
 
     return piece_types, piece_stats
 
@@ -160,23 +202,24 @@ def identical_piece_check(desired_totals, piece_types, piece_stats):
 # MILP solver (exact + approximate)
 # ----------------------------
 
-def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solutions=5, allow_tuned=True):
+def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solutions=5, allow_tuned=True,
+                             require_exotic=False):
     if not HAS_PULP:
         raise RuntimeError("pulp not installed; can't run MILP")
 
     solutions = []
     deviations = []
 
-    # Fast-path: all-identical pieces
-    ident = identical_piece_check(desired_totals, piece_types, piece_stats)
-    if ident:
-        solutions.append(ident)
-        deviations.append(0.0)
+    # Fast-path identical only when no exotic is required
+    if not require_exotic:
+        ident = identical_piece_check(desired_totals, piece_types, piece_stats)
+        if ident:
+            solutions.append(ident)
+            deviations.append(0.0)
 
     exclusions = []
 
     def solve_problem(allow_deviation=False):
-        # Correct sense argument (avoid the earlier bug)
         prob = pulp.LpProblem("DestinyArmor3", pulp.LpMinimize)
         x = {p: pulp.LpVariable(f"x_{i}", lowBound=0, upBound=5, cat="Integer")
              for i, p in enumerate(piece_types)}
@@ -188,6 +231,14 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
         # exactly 5 pieces
         prob += pulp.lpSum(x[p] for p in piece_types) == 5
 
+        # require exactly one exotic if requested
+        if require_exotic:
+            exotic_vars = [x[p] for p in piece_types if str(p.arch).lower().startswith("exotic ")]
+            if exotic_vars:
+                prob += pulp.lpSum(exotic_vars) == 1
+            else:
+                return None, None
+
         # stat matching
         for si, s in enumerate(STAT_NAMES):
             total_stat = pulp.lpSum(x[p] * piece_stats[p][si] for p in piece_types)
@@ -196,18 +247,15 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
             else:
                 prob += total_stat == desired_totals[si]
 
-        # objective
+        # objective (prefer easier pieces)
+        ease_bonus = pulp.lpSum(x[p] * (1 if getattr(p, 'tuning_mode', 'none') != "tuned" else 0) for p in piece_types)
         if allow_deviation:
-            # minimize total deviation; tiny tie-break to prefer easy pieces
             deviation_cost = pulp.lpSum(dev_pos[s] + dev_neg[s] for s in STAT_NAMES)
-            ease_bonus = pulp.lpSum(x[p] * (1 if p.tuning_mode != "tuned" else 0) for p in piece_types)
             prob += deviation_cost - 0.01 * ease_bonus
         else:
-            # prefer easier farming (none/balanced), then fewer distinct types implicitly via exclusions
-            ease_bonus = pulp.lpSum(x[p] * (1 if p.tuning_mode != "tuned" else 0) for p in piece_types)
             prob += -1 * ease_bonus
 
-        # exclude prior complete selections
+        # exclude prior exact selections
         for excl in exclusions:
             prob += pulp.lpSum(x[p] for p in excl) <= 4
 
@@ -231,10 +279,10 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
             deviations.append(dev)
         exclusions.append(list(sol.keys()))
 
-    # Phase 2: approximate solutions if none found
+    # Phase 2: approximations if needed
     if not solutions:
-        exclusions = []  # reset exclusions
-        while len(solutions) < 3: # approximate solutions take long, only produce 3
+        exclusions = []
+        while len(solutions) < min(3, max_solutions):
             sol, dev = solve_problem(allow_deviation=True)
             if not sol:
                 break
@@ -243,7 +291,6 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
                 deviations.append(dev)
             exclusions.append(list(sol.keys()))
 
-    # sort by farmability then deviation
     combined = list(zip(solutions, deviations))
     combined.sort(key=lambda sd: (difficulty_score(sd[0]), sd[1]))
     if combined:
@@ -271,19 +318,22 @@ def calculate_actual_stats(sol, piece_stats):
 def format_solution(sol, deviation=0.0, desired_stats=None, piece_stats=None):
     armor_lines = []
     mods = defaultdict(int)  # group +10 mods by stat only (hidden from piece lines)
-    
+
     # Group identical pieces by their string representation for display
     piece_groups = defaultdict(int)
     for p, count in sol.items():
         if p.tuning_mode == "balanced":
-            key = f"{p.arch} (tertiary={p.tertiary}) (tuning=ANY) Balanced Tuning (+1 to 3 lowest stats)"
+            prefix = "[EXOTIC] " if str(p.arch).lower().startswith("exotic ") else ""
+            key = f"{prefix}{p.arch} (tertiary={p.tertiary}) (tuning=ANY) Balanced Tuning (+1 to 3 lowest stats)"
         elif p.tuning_mode == "tuned":
-            key = f"{p.arch} (tertiary={p.tertiary}) (tuning={p.tuned_stat}) +{p.tuned_stat}/-{p.siphon_from}"
+            prefix = "[EXOTIC] " if str(p.arch).lower().startswith("exotic ") else ""
+            key = f"{prefix}{p.arch} (tertiary={p.tertiary}) (tuning={p.tuned_stat}) +{p.tuned_stat}/-{p.siphon_from}"
         else:
-            key = f"{p.arch} (tertiary={p.tertiary}) (tuning=ANY) No Tuning"
+            prefix = "[EXOTIC] " if str(p.arch).lower().startswith("exotic ") else ""
+            key = f"{prefix}{p.arch} (tertiary={p.tertiary}) (tuning=ANY) No Tuning"
         piece_groups[key] += count
         mods[p.mod_target] += count
-    
+
     # Create armor lines from grouped pieces
     for piece_desc, total_count in piece_groups.items():
         armor_lines.append(f"{total_count}x {piece_desc}")
@@ -305,7 +355,8 @@ def format_solution(sol, deviation=0.0, desired_stats=None, piece_stats=None):
                 diff = actual[i] - desired_stats[i]
                 lines.append(f"{name:<9} | {actual[i]:6} | {desired_stats[i]:7} | {diff:+6}")
             lines.append("----------|--------|---------|----------")
-            lines.append(f"{'Total':<9} | {sum(actual):6} | {sum(desired_stats):7} | {sum(actual)-sum(desired_stats):+6}")
+            lines.append(
+                f"{'Total':<9} | {sum(actual):6} | {sum(desired_stats):7} | {sum(actual) - sum(desired_stats):+6}")
     else:
         lines.append("\nExact match")
 
@@ -317,29 +368,50 @@ def format_solution(sol, deviation=0.0, desired_stats=None, piece_stats=None):
 # ----------------------------
 if __name__ == "__main__":
     desired = {
-        "Health": 160,
-        "Melee": 155,
-        "Grenade": 30,
-        "Super": 110,
-        "Class": 30,
+        "Health": 30,
+        "Melee": 70,
+        "Grenade": 180,
+        "Super": 120,
+        "Class": 70,
         "Weapons": 30,
     }
     desired_vec = [desired[s] for s in STAT_NAMES]
 
-    # Test both with and without +5/-5 tuning
-    for allow_tuned in [True, False]:
-        tuning_mode = "with +5/-5 tuning" if allow_tuned else "without +5/-5 tuning"
-        print(f"\n{'='*60}")
-        print(f"Testing {tuning_mode}")
-        print(f"{'='*60}")
-        
-        piece_types, piece_stats = generate_piece_types(allow_tuned=allow_tuned)
-        print(f"Generated {len(piece_types)} piece configurations.")
+    # User-configurable options
+    allow_tuned = True            # Toggle +5/-5 tuning
+    use_exotic = True             # Toggle using an exotic piece
+    use_class_item_exotic = True # Toggle using an exotic class item
+    exotic_perks = ("Spirit of Inmost Light", "Spirit of Cyrtarachne")           # Only used if use_class_item_exotic=True, e.g. ("Spirit of Inmost Light", "Spirit of Synthoceps")
 
-        sols, devs = solve_with_milp_multiple(desired_vec, piece_types, piece_stats, max_solutions=5, allow_tuned=allow_tuned)
-        if not sols:
-            print("No solutions found.")
-        else:
-            for i, (s, d) in enumerate(zip(sols, devs), 1):
-                print(f"\nSolution {i}:")
-                print(format_solution(s, d, desired_vec, piece_stats))
+    print(f"\n{'='*60}")
+    print(f"Testing configuration:")
+    print(f"allow_tuned = {allow_tuned}")
+    print(f"use_exotic = {use_exotic}")
+    print(f"use_class_item_exotic = {use_class_item_exotic}")
+    if use_class_item_exotic:
+        print(f"exotic_perks = {exotic_perks}")
+    print(f"{'='*60}")
+
+    piece_types, piece_stats = generate_piece_types(
+        allow_tuned=allow_tuned,
+        use_exotic=use_exotic,
+        use_class_item_exotic=use_class_item_exotic,
+        exotic_perks=exotic_perks
+    )
+    print(f"Generated {len(piece_types)} piece configurations.")
+
+    sols, devs = solve_with_milp_multiple(
+        desired_vec,
+        piece_types,
+        piece_stats,
+        max_solutions=5,
+        allow_tuned=allow_tuned,
+        require_exotic=use_exotic
+    )
+    if not sols:
+        print("No solutions found.")
+    else:
+        for i, (s, d) in enumerate(zip(sols, devs), 1):
+            print(f"\nSolution {i}:")
+            print(format_solution(s, d, desired_vec, piece_stats))
+
