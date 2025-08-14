@@ -90,9 +90,25 @@ i.e., each armor piece will have the following stats:
 5 Class
 5 Weapons
 
-# Current Known Limitations
+# Architecture
 
-There are a few main limitations of our current system:
+## Frontend
+- **Next.js 15** with TypeScript
+- **Tailwind CSS** for styling
+- **React Hook Form** with Zod validation
+- **Deployed on Vercel**
 
-1. No support for IMPOSSIBLE statlines. If input stats are impossible to attain given the constraints of the Destiny 2 Armor 3.0 system, no solution is provided. Ideally, we should try and provide a solution that gets as close as possible to the input.
-2. No front-end.
+## Backend  
+- **Vercel Functions** with Python 3.9+
+- **PuLP optimization library** with CBC solver
+- **Mixed Integer Linear Programming** for optimal solutions
+- **Auto-scaling** serverless functions
+
+## Key Features
+- **Exact optimization** using MILP algorithms
+- **Exotic class item support** with conditional perk selection  
+- **Minimum stat constraints** with lock toggles
+- **Balanced tuning** support (+1 to three lowest stats)
+- **Difficulty scoring** (tuned vs non-tuned pieces)
+- **30-second timeout** for complex optimizations
+- **Approximate solutions** when exact matches impossible
