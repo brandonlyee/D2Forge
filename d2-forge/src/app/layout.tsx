@@ -18,6 +18,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "D2 Forge",
   description: "Forge optimal Destiny 2 armor builds using Mixed Integer Linear Programming",
+  icons: {
+    icon: "/d2-forge.svg",
+  },
 };
 
 export default function RootLayout({
