@@ -29,6 +29,7 @@ class StatRequest(BaseModel):
     use_exotic: bool = False  # Default to no exotic armor
     use_class_item_exotic: bool = False  # Default to regular exotic if exotic is enabled
     exotic_perks: Optional[List[str]] = None  # List of 2 perk names for exotic class item
+    minimum_constraints: Optional[Dict[str, Optional[int]]] = None  # Minimum values for each stat (null means no constraint)
 
 class PieceInfo(BaseModel):
     arch: str
@@ -95,10 +96,11 @@ async def optimize_stats(request: StatRequest):
             desired_totals, 
             piece_types, 
             piece_stats, 
-            max_solutions=5, 
+            max_solutions=10,
             allow_tuned=request.allow_tuned,
             require_exotic=request.use_exotic,
-            total_timeout=30  # 30 seconds for approximations
+            total_timeout=30,  # 30 seconds for approximations
+            minimum_constraints=request.minimum_constraints
         )
         
         if not solutions_list:

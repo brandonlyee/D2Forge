@@ -8,7 +8,8 @@ export async function POST(request: NextRequest) {
       allow_tuned = true,
       use_exotic = false,
       use_class_item_exotic = false,
-      exotic_perks
+      exotic_perks,
+      minimum_constraints
     } = body
 
     // Validate input
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           Health, Melee, Grenade, Super, Class, Weapons, 
-          allow_tuned, use_exotic, use_class_item_exotic, exotic_perks 
+          allow_tuned, use_exotic, use_class_item_exotic, exotic_perks, minimum_constraints 
         }),
       })
 

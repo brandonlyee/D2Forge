@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Info } from 'lucide-react'
+import { Info, Lock } from 'lucide-react'
 import { StatIcon } from '@/components/stat-icon'
 
 const STAT_NAMES = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"] as const
@@ -96,6 +96,13 @@ const formSchema = z.object({
   Super: z.number().min(0).max(225),
   Class: z.number().min(0).max(225),
   Weapons: z.number().min(0).max(225),
+  // Minimum constraint locks for each stat
+  Health_min: z.boolean(),
+  Melee_min: z.boolean(),
+  Grenade_min: z.boolean(),
+  Super_min: z.boolean(),
+  Class_min: z.boolean(),
+  Weapons_min: z.boolean(),
   allow_tuned: z.boolean(),
   use_exotic: z.boolean(),
   use_class_item_exotic: z.boolean(),
@@ -129,6 +136,13 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
       Super: 100,
       Class: 75,
       Weapons: 25,
+      // Default minimum constraints to false
+      Health_min: false,
+      Melee_min: false,
+      Grenade_min: false,
+      Super_min: false,
+      Class_min: false,
+      Weapons_min: false,
       allow_tuned: true,
       use_exotic: false,
       use_class_item_exotic: false,
@@ -225,9 +239,35 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
                   name={statName}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium flex items-center gap-2">
-                        <StatIcon stat={statName} size={20} />
-                        {statName}
+                      <FormLabel className="text-sm font-medium flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <StatIcon stat={statName} size={20} />
+                          {statName}
+                        </div>
+                        <FormField
+                          control={form.control}
+                          name={`${statName}_min` as keyof FormData}
+                          render={({ field: lockField }) => (
+                            <div className="flex items-center gap-2">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-1">
+                                      <Lock className="h-3 w-3 text-muted-foreground" suppressHydrationWarning />
+                                      <Switch
+                                        checked={Boolean(lockField.value)}
+                                        onCheckedChange={lockField.onChange}
+                                      />
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Lock as minimum: If possible, solutions must have at least this value</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          )}
+                        />
                       </FormLabel>
                       <FormControl>
                         <div className="space-y-3">
