@@ -143,10 +143,22 @@ export default function Home() {
           </div>
 
           {/* Footer */}
-          <footer className="text-center text-sm text-muted-foreground border-t pt-8">
+          <footer className="text-center text-sm text-muted-foreground border-t pt-8 space-y-2">
             <p>
               Built with Next.js, shadcn/ui, and Python. 
               Uses Mixed Integer Linear Programming (MILP) to find optimal armor builds.
+            </p>
+            <p>
+              Developed by{' '}
+              <a 
+                href="https://x.com/mojobukoo" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:text-blue-400 transition-colors"
+              >
+                @mojobukoo
+              </a>
+              . Please reach out for any suggestions/improvements!
             </p>
           </footer>
         </div>
