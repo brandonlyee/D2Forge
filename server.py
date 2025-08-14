@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 import json
 
 # Import the existing optimization functions
@@ -30,14 +30,6 @@ class StatRequest(BaseModel):
     use_class_item_exotic: bool = False  # Default to regular exotic if exotic is enabled
     exotic_perks: Optional[List[str]] = None  # List of 2 perk names for exotic class item
     minimum_constraints: Optional[Dict[str, Optional[int]]] = None  # Minimum values for each stat (null means no constraint)
-
-class PieceInfo(BaseModel):
-    arch: str
-    tertiary: str
-    tuning_mode: str  # "none", "tuned", "balanced"
-    mod_target: str
-    tuned_stat: Optional[str] = None
-    siphon_from: Optional[str] = None
 
 class Solution(BaseModel):
     pieces: Dict[str, int]  # JSON string key -> count
