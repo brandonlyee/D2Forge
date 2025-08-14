@@ -107,7 +107,7 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
             Optimal Armor Builds Found
           </CardTitle>
           <CardDescription>
-            {solutions.length} solution{solutions.length !== 1 ? 's' : ''} found, ranked by farming difficulty
+            {solutions.length} solution{solutions.length !== 1 ? 's' : ''} found within the time limit, ranked by farming difficulty
           </CardDescription>
         </CardHeader>
       </Card>

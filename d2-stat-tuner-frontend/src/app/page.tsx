@@ -18,6 +18,13 @@ interface FormData {
   Super: number
   Class: number
   Weapons: number
+  // Minimum constraint locks for each stat
+  Health_min: boolean
+  Melee_min: boolean
+  Grenade_min: boolean
+  Super_min: boolean
+  Class_min: boolean
+  Weapons_min: boolean
   allow_tuned: boolean
   use_exotic: boolean
   use_class_item_exotic: boolean
@@ -42,7 +49,11 @@ export default function Home() {
     setIsLoading(true)
     setError(null) // Clear previous errors
     // Extract only the stat values for display, excluding optimization options
-    const { allow_tuned, use_exotic, use_class_item_exotic, exotic_perk1, exotic_perk2, ...statValues } = data
+    const { 
+      allow_tuned, use_exotic, use_class_item_exotic, exotic_perk1, exotic_perk2,
+      Health_min, Melee_min, Grenade_min, Super_min, Class_min, Weapons_min,
+      ...statValues 
+    } = data
     setDesiredStats(statValues)
     setSolutions([]) // Clear previous results
 
@@ -52,9 +63,20 @@ export default function Home() {
         ? [exotic_perk1, exotic_perk2] 
         : undefined
 
+      // Prepare minimum constraints for backend
+      const minimum_constraints = {
+        Health: Health_min ? data.Health : null,
+        Melee: Melee_min ? data.Melee : null,
+        Grenade: Grenade_min ? data.Grenade : null,
+        Super: Super_min ? data.Super : null,
+        Class: Class_min ? data.Class : null,
+        Weapons: Weapons_min ? data.Weapons : null,
+      }
+
       const requestData = {
         ...data,
-        exotic_perks
+        exotic_perks,
+        minimum_constraints
       }
 
       // Call our API route which will eventually call the Python backend

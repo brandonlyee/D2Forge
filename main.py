@@ -395,12 +395,14 @@ def normalize_solution(sol):
 
 
 def difficulty_score(sol):
-    """Lower is better: fewer distinct types; only 'tuned' increases difficulty.
-    We reward 'none' and 'balanced' equally (easiest to farm).
+    """Lower is better: fewer distinct types; tuned pieces are significantly harder to farm.
+    Tuned pieces require: right archetype (1/6) + right tertiary (1/4) + right tuning (1/6) = 1/144 chance
+    Non-tuned pieces require: right archetype (1/6) + right tertiary (1/4) = 1/24 chance
+    So tuned pieces are ~6x harder to farm than distinct piece types.
     """
     distinct_types = len(sol)
     tuning_count = sum(1 for p in sol if p.tuning_mode == "tuned")
-    return distinct_types * 10 + tuning_count
+    return distinct_types * 10 + tuning_count * 60  # 60 points per tuned piece vs 10 per distinct type
 
 
 def identical_piece_check(desired_totals, piece_types, piece_stats):
@@ -416,8 +418,8 @@ def identical_piece_check(desired_totals, piece_types, piece_stats):
 # MILP solver (exact + approximate)
 # ----------------------------
 
-def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solutions=5, allow_tuned=True,
-                             require_exotic=False, total_timeout=120):
+def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solutions=10, allow_tuned=True,
+                             require_exotic=False, total_timeout=120, minimum_constraints=None):
     if not HAS_PULP:
         raise RuntimeError("pulp not installed; can't run MILP")
 
@@ -469,11 +471,21 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
                 prob += total_stat - desired_totals[si] == dev_pos[s] - dev_neg[s]
             else:
                 prob += total_stat == desired_totals[si]
+        
+        # minimum constraints (must be satisfied even with deviation)
+        if minimum_constraints:
+            for si, s in enumerate(STAT_NAMES):
+                min_value = minimum_constraints.get(s)
+                if min_value is not None:
+                    total_stat = pulp.lpSum(x[p] * piece_stats[p][si] for p in piece_types)
+                    prob += total_stat >= min_value
 
         # objective (prefer easier pieces)
         ease_bonus = pulp.lpSum(x[p] * (1 if getattr(p, 'tuning_mode', 'none') != "tuned" else 0) for p in piece_types)
         if allow_deviation:
-            deviation_cost = pulp.lpSum(dev_pos[s] + dev_neg[s] for s in STAT_NAMES)
+            # Weight negative deviations (missing stats) much more heavily than positive (excess stats)
+            # Missing stats hurt builds significantly more than having extra stats
+            deviation_cost = pulp.lpSum(0.2 * dev_pos[s] + 5.0 * dev_neg[s] for s in STAT_NAMES)
             prob += deviation_cost - 0.01 * ease_bonus
         else:
             prob += -1 * ease_bonus
@@ -492,7 +504,8 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
         sol = {p: int(round(x[p].value())) for p in piece_types if x[p].value() and x[p].value() > 0.5}
         dev_total = 0.0
         if allow_deviation:
-            dev_total = sum((dev_pos[s].value() or 0) + (dev_neg[s].value() or 0) for s in STAT_NAMES)
+            # Apply same weighting as in objective: negative deviations are much worse than positive
+            dev_total = sum(0.2 * (dev_pos[s].value() or 0) + 5.0 * (dev_neg[s].value() or 0) for s in STAT_NAMES)
         return normalize_solution(sol), dev_total
 
     # Phase 1: find exact solutions (no timeout)
@@ -510,7 +523,7 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
         exclusions = []
         # Reset start time for Phase 2 timeout
         start_time = time.time()
-        while len(solutions) < min(3, max_solutions):
+        while len(solutions) < max_solutions:
             # Check if we've exceeded total timeout
             if time.time() - start_time >= total_timeout:
                 break
@@ -636,7 +649,7 @@ if __name__ == "__main__":
         desired_vec,
         piece_types,
         piece_stats,
-        max_solutions=5,
+        max_solutions=10,
         allow_tuned=allow_tuned,
         require_exotic=use_exotic,
         total_timeout=30  # 30 second timeout for Phase 2 only
