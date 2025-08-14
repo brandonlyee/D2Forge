@@ -63,7 +63,7 @@ class handler(BaseHTTPRequestHandler):
                 exotic_perks=exotic_perks_tuple
             )
             
-            # Run the optimization with 9-second timeout for Vercel Functions
+            # Run the optimization with full 30-second timeout (Vercel Hobby allows 300s)
             solutions_list, deviations_list = solve_with_milp_multiple(
                 desired_totals, 
                 piece_types, 
@@ -71,7 +71,7 @@ class handler(BaseHTTPRequestHandler):
                 max_solutions=10,
                 allow_tuned=allow_tuned,
                 require_exotic=use_exotic,
-                total_timeout=9,  # 9 seconds - max safe timeout for Vercel's 10s limit
+                total_timeout=30,
                 minimum_constraints=minimum_constraints
             )
             
