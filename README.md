@@ -1,6 +1,6 @@
 # Project Overview
 
-D2StatTuner is a Destiny 2 Edge of Fate Armor 3.0 Stat Optimizer, that takes in a set of character stats as input, and outputs solutions containing what specific gear is required in order to achieve the inputted stats. Solutions are scored by difficulty to obtain, where multiple armor archetypes, or requiring tuning mods increases difficulty. The solutions with the lowest difficulty are output.
+D2 Forge is a Destiny 2 Edge of Fate Armor 3.0 Build Optimizer, that takes in a set of character stats as input, and outputs solutions containing what specific gear is required in order to achieve the inputted stats. Solutions are scored by difficulty to obtain, where multiple armor archetypes, or requiring tuning mods increases difficulty. The solutions with the lowest difficulty are output.
 
 # Destiny 2 Edge of Fate Armor 3.0 
 

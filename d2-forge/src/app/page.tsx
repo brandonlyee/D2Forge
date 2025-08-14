@@ -114,11 +114,18 @@ export default function Home() {
               <ThemeToggle />
             </div>
             <div className="text-center space-y-4">
-              <h1 className="text-4xl font-bold tracking-tight">
-                D2 Stat Tuner
-              </h1>
+              <div className="flex items-center justify-center gap-3">
+                <img 
+                  src="/d2-forge.svg" 
+                  alt="D2 Forge Logo" 
+                  className="w-12 h-12"
+                />
+                <h1 className="text-4xl font-bold tracking-tight">
+                  D2 Forge
+                </h1>
+              </div>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Find the optimal Destiny 2 armor combinations to achieve your desired stat distribution 
+                Forge optimal Destiny 2 armor builds to achieve your desired stat distribution 
                 using Mixed Integer Linear Programming.
               </p>
             </div>
@@ -145,7 +152,7 @@ export default function Home() {
           {/* Footer */}
           <footer className="text-center text-sm text-muted-foreground border-t pt-8 space-y-2">
             <p>
-              Built with Next.js, shadcn/ui, and Python. 
+              Built with Next.js and Python.
               Uses Mixed Integer Linear Programming (MILP) to find optimal armor builds.
             </p>
             <p>
