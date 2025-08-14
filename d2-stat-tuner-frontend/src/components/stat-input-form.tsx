@@ -261,7 +261,7 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
                                     </div>
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    <p>Lock as minimum: solutions must have at least this value</p>
+                                    <p>Lock as minimum: If possible, solutions must have at least this value</p>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>

@@ -121,7 +121,7 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                 <Badge className="ml-2" variant="default">Exact Match</Badge>
               ) : (
                 <Badge className="ml-2" variant="secondary">
-                  ~{solution.deviation.toFixed(1)} deviation
+                  ~{solution.deviation.toFixed(1)} deviation score
                 </Badge>
               )}
             </CardTitle>
