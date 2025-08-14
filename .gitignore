@@ -69,3 +69,4 @@ pids
 
 # Temporary files
 test_impossible.py
+.vercel

@@ -108,15 +108,6 @@ const formSchema = z.object({
   use_class_item_exotic: z.boolean(),
   exotic_perk1: z.string().optional(),
   exotic_perk2: z.string().optional(),
-}).refine((data) => {
-  // If using exotic class item, both perks must be selected
-  if (data.use_exotic && data.use_class_item_exotic) {
-    return data.exotic_perk1 && data.exotic_perk2
-  }
-  return true
-}, {
-  message: "Both perks must be selected when using exotic class item",
-  path: ["exotic_perk1"] // This will show the error on the first perk field
 })
 
 type FormData = z.infer<typeof formSchema>

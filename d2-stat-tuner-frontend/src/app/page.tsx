@@ -79,7 +79,7 @@ export default function Home() {
         minimum_constraints
       }
 
-      // Call our API route which will eventually call the Python backend
+      // Call our Vercel Function directly
       const response = await fetch('/api/optimize', {
         method: 'POST',
         headers: {
