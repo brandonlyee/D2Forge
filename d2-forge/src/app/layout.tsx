@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "D2 Stat Tuner",
-  description: "Optimize your Destiny 2 armor stats using Mixed Integer Linear Programming",
+  title: "D2 Forge",
+  description: "Forge optimal Destiny 2 armor builds using Mixed Integer Linear Programming",
 };
 
 export default function RootLayout({

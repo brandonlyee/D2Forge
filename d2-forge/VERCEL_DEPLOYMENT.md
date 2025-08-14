@@ -1,10 +1,6 @@
 # Vercel Functions Deployment Guide
 
-## Migration Complete ✅
-
-Your D2 Stat Tuner has been successfully migrated from Railway/external Python backend to Vercel Functions with Python runtime.
-
-## New Architecture
+## Architecture
 
 - **Frontend**: Next.js (unchanged)
 - **Backend**: Vercel Functions with Python runtime

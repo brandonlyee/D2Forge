@@ -115,10 +115,10 @@ export default function Home() {
             </div>
             <div className="text-center space-y-4">
               <h1 className="text-4xl font-bold tracking-tight">
-                D2 Stat Tuner
+                D2 Forge
               </h1>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Find the optimal Destiny 2 armor combinations to achieve your desired stat distribution 
+                Forge optimal Destiny 2 armor builds to achieve your desired stat distribution 
                 using Mixed Integer Linear Programming.
               </p>
             </div>

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-D2StatTuner is a Destiny 2 armor stat optimization tool that uses Mixed Integer Linear Programming (MILP) to find optimal armor configurations. The tool generates armor piece combinations to achieve desired stat distributions for the 6 stats: Health, Melee, Grenade, Super, Class, and Weapons.
+D2 Forge is a Destiny 2 armor build optimization tool that uses Mixed Integer Linear Programming (MILP) to find optimal armor configurations. The tool generates armor piece combinations to achieve desired stat distributions for the 6 stats: Health, Melee, Grenade, Super, Class, and Weapons.
 
 ## Commands
 
