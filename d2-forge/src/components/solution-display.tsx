@@ -269,7 +269,9 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                           {tuningDetails.map((detail, detailIndex) => (
                             <div key={detailIndex} className="p-2 border rounded-lg bg-muted/50 mb-2">
                               <div className="flex items-center gap-2">
-                                <span className="font-medium">{detail.count} x +5/-5 Tuning</span>
+                                <span className="font-medium flex items-center gap-1">
+                                  {detail.count} x <StatIcon stat={stat} size={16} /> {stat} Tuning:
+                                </span>
                                 <span className="flex items-center gap-1">
                                   +5 <StatIcon stat={stat} size={16} /> {stat}
                                 </span>
