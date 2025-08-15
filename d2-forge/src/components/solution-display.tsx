@@ -20,7 +20,7 @@ interface Solution {
   pieces: Record<string, number> // PieceType as string key -> count
   deviation: number
   actualStats?: number[]
-  tuningRequirements?: Record<string, number> // stat -> count of +5/-5 tunings needed
+  tuningRequirements?: Record<string, Array<{count: number, siphon_from: string}>> // stat -> array of tuning details
   flexiblePieces?: number // count of pieces that can accept any +5/-5 tuning
 }
 
@@ -259,49 +259,72 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
               </div>
 
               {/* Tuning Requirements Section */}
-              {solution.tuningRequirements && Object.keys(solution.tuningRequirements).length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-3">Tuning Requirements:</h4>
-                  <div className="space-y-2">
-                    {Object.entries(solution.tuningRequirements).map(([stat, count], index) => (
-                      <div key={index} className="p-2 border rounded-lg bg-orange-50 border-orange-200">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-orange-800">{count} x +5/-5 Tuning</span>
-                          <StatIcon stat={stat} size={16} />
-                          <span className="font-medium text-orange-800">{stat}</span>
+              <div>
+                <h4 className="font-medium mb-3">Tuning Requirements:</h4>
+                <div className="space-y-2">
+                  {solution.tuningRequirements && Object.keys(solution.tuningRequirements).length > 0 ? (
+                    <>
+                      {Object.entries(solution.tuningRequirements).map(([stat, tuningDetails], index) => (
+                        <div key={index}>
+                          {tuningDetails.map((detail, detailIndex) => (
+                            <div key={detailIndex} className="p-2 border rounded-lg bg-muted/50 mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{detail.count} x +5/-5 Tuning</span>
+                                <span className="flex items-center gap-1">
+                                  +5 <StatIcon stat={stat} size={16} /> {stat}
+                                </span>
+                                <span>/</span>
+                                <span className="flex items-center gap-1">
+                                  -5 <StatIcon stat={detail.siphon_from} size={16} /> {detail.siphon_from}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      </div>
-                    ))}
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="text-sm text-blue-800">
-                        <div className="font-medium mb-1">Tuning Allocation:</div>
-                        {(() => {
-                          const totalTuningNeeded = Object.values(solution.tuningRequirements).reduce((sum, count) => sum + count, 0)
-                          const flexiblePieces = solution.flexiblePieces || 0
-                          
-                          if (flexiblePieces >= totalTuningNeeded) {
-                            return (
-                              <p>
-                                ✅ You have <strong>{flexiblePieces}</strong> flexible pieces that can accept any +5/-5 tuning.
-                                <br />
-                                Only <strong>{totalTuningNeeded}</strong> tuning mod(s) needed, so you have options for allocation.
-                              </p>
-                            )
-                          } else {
-                            return (
-                              <p>
-                                ⚠️ You need <strong>{totalTuningNeeded}</strong> tuning mod(s) but only have <strong>{flexiblePieces}</strong> flexible piece(s).
-                                <br />
-                                This should not happen - please report this as a bug.
-                              </p>
-                            )
-                          }
-                        })()}
-                      </div>
+                      ))}
+                    </>
+                  ) : null}
+                  
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="text-sm text-blue-800">
+                      <div className="font-medium mb-1">Tuning Allocation:</div>
+                      {(() => {
+                        const totalTuningNeeded = solution.tuningRequirements 
+                          ? Object.values(solution.tuningRequirements).reduce((sum, details) => 
+                              sum + details.reduce((detailSum, detail) => detailSum + detail.count, 0), 0)
+                          : 0
+                        const flexiblePieces = solution.flexiblePieces || 0
+                        
+                        if (totalTuningNeeded === 0) {
+                          return (
+                            <p>
+                              ✅ No specific +5/-5 tuning mods required for this build.
+                              <br />
+                              You have <strong>{flexiblePieces}</strong> piece(s) that can optionally accept any +5/-5 tuning.
+                            </p>
+                          )
+                        } else if (flexiblePieces >= totalTuningNeeded) {
+                          return (
+                            <p>
+                              ✅ You have <strong>{flexiblePieces}</strong> flexible pieces that can accept any +5/-5 tuning.
+                              <br />
+                              Only <strong>{totalTuningNeeded}</strong> tuning mod(s) needed, so you have options for allocation.
+                            </p>
+                          )
+                        } else {
+                          return (
+                            <p>
+                              ⚠️ You need <strong>{totalTuningNeeded}</strong> tuning mod(s) but only have <strong>{flexiblePieces}</strong> flexible piece(s).
+                              <br />
+                              This should not happen - please report this as a bug.
+                            </p>
+                          )
+                        }
+                      })()}
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
 
               {/* Stat Distribution (if available) */}
               {solution.actualStats && (

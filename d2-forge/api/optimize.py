@@ -103,7 +103,13 @@ class handler(BaseHTTPRequestHandler):
                         
                         # Track tuning requirements separately
                         if piece_type.tuning_mode == "tuned":
-                            tuning_requirements[piece_type.tuned_stat] = tuning_requirements.get(piece_type.tuned_stat, 0) + count
+                            # Store as {stat: [{"count": count, "siphon_from": stat}, ...]}
+                            if piece_type.tuned_stat not in tuning_requirements:
+                                tuning_requirements[piece_type.tuned_stat] = []
+                            tuning_requirements[piece_type.tuned_stat].append({
+                                "count": count,
+                                "siphon_from": piece_type.siphon_from
+                            })
                             # This piece can accept flexible tuning
                             flexible_pieces += count
                         elif piece_type.tuning_mode == "none" and not str(piece_type.arch).lower().startswith("exotic "):
