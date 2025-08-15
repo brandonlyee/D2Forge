@@ -4,6 +4,9 @@ import React, { useState } from 'react'
 import { StatInputForm } from '@/components/stat-input-form'
 import { SolutionDisplay } from '@/components/solution-display'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { Button } from '@/components/ui/button'
+import { ClipboardList } from 'lucide-react'
+import Link from 'next/link'
 
 interface Solution {
   pieces: Record<string, number>
@@ -110,7 +113,13 @@ export default function Home() {
         <div className="max-w-7xl mx-auto space-y-8">
           {/* Header */}
           <div className="relative">
-            <div className="absolute top-0 right-0">
+            <div className="absolute top-0 right-0 flex items-center gap-2">
+              <Link href="/checklists">
+                <Button variant="outline" size="icon" className="w-auto px-3">
+                  <ClipboardList className="h-4 w-4 mr-2" />
+                  My Checklists
+                </Button>
+              </Link>
               <ThemeToggle />
             </div>
             <div className="text-center space-y-4">

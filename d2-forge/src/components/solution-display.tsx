@@ -4,8 +4,11 @@ import React from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle, AlertTriangle } from 'lucide-react'
+import { CheckCircle, AlertTriangle, ClipboardList } from 'lucide-react'
 import { StatIcon } from '@/components/stat-icon'
+import { Button } from '@/components/ui/button'
+import { expandSolutionToChecklist, saveChecklist } from '@/lib/checklist-utils'
+import { useRouter } from 'next/navigation'
 
 interface PieceType {
   arch: string
@@ -34,6 +37,21 @@ interface SolutionDisplayProps {
 const STAT_NAMES = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"]
 
 export function SolutionDisplay({ solutions, desiredStats, isLoading = false, error = null }: SolutionDisplayProps) {
+  const router = useRouter()
+
+  const handleAddToChecklist = (solution: Solution, solutionIndex: number) => {
+    try {
+      const checklist = expandSolutionToChecklist(solution, desiredStats, solutionIndex)
+      saveChecklist(checklist)
+      
+      // Show success message and navigate to checklists
+      alert('Build added to your checklists!')
+      router.push('/checklists')
+    } catch (error) {
+      console.error('Failed to create checklist:', error)
+      alert('Failed to create checklist. Please try again.')
+    }
+  }
   
   if (error) {
     return (
@@ -117,16 +135,27 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
       {solutions.map((solution, index) => (
         <Card key={index}>
           <CardHeader>
-            <CardTitle className="text-lg">
-              Solution {index + 1}
-              {solution.deviation === 0 ? (
-                <Badge className="ml-2" variant="default">Exact Match</Badge>
-              ) : (
-                <Badge className="ml-2" variant="secondary">
-                  ~{solution.deviation.toFixed(1)} deviation score
-                </Badge>
-              )}
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">
+                Solution {index + 1}
+                {solution.deviation === 0 ? (
+                  <Badge className="ml-2" variant="default">Exact Match</Badge>
+                ) : (
+                  <Badge className="ml-2" variant="secondary">
+                    ~{solution.deviation.toFixed(1)} deviation score
+                  </Badge>
+                )}
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleAddToChecklist(solution, index)}
+                className="flex items-center gap-2"
+              >
+                <ClipboardList className="h-4 w-4" />
+                Add to Checklist
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
