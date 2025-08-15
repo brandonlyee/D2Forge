@@ -20,6 +20,8 @@ interface Solution {
   pieces: Record<string, number> // PieceType as string key -> count
   deviation: number
   actualStats?: number[]
+  tuningRequirements?: Record<string, number> // stat -> count of +5/-5 tunings needed
+  flexiblePieces?: number // count of pieces that can accept any +5/-5 tuning
 }
 
 interface SolutionDisplayProps {
@@ -133,20 +135,18 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                 <h4 className="font-medium mb-3">Armor Pieces:</h4>
                 <div className="space-y-2">
                   {(() => {
-                    // Group pieces by everything except mod_target
+                    // Group pieces by arch and tertiary only (ignoring tuning specifics)
                     const groupedPieces: Record<string, { pieces: Array<{piece: PieceType, count: number}>, totalCount: number }> = {}
                     
                     Object.entries(solution.pieces).forEach(([pieceKey, count]) => {
                       try {
                         const piece: PieceType = JSON.parse(pieceKey)
                         
-                        // Create grouping key without mod_target
+                        // Create grouping key without mod_target and specific tuning details
                         const groupKey = JSON.stringify({
                           arch: piece.arch,
                           tertiary: piece.tertiary,
-                          tuning_mode: piece.tuning_mode,
-                          tuned_stat: piece.tuned_stat,
-                          siphon_from: piece.siphon_from
+                          tuning_mode: piece.tuning_mode === "tuned" ? "flexible" : piece.tuning_mode // Group tuned pieces as "flexible"
                         })
                         
                         if (!groupedPieces[groupKey]) {
@@ -165,19 +165,35 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                       
                       const firstPiece = group.pieces[0].piece
                       const isExotic = firstPiece.arch.toLowerCase().includes('exotic')
+                      const isFlexible = firstPiece.tuning_mode === "tuned" || (firstPiece.tuning_mode === "none" && !isExotic)
                       
                       const getBadgeVariant = () => {
                         if (isExotic) return "destructive"
                         if (firstPiece.tuning_mode === "balanced") return "default"
-                        if (firstPiece.tuning_mode === "tuned") return "secondary" 
+                        if (isFlexible) return "secondary" 
                         return "outline"
                       }
                       
                       const getBadgeText = () => {
                         if (isExotic) return "Exotic"
                         if (firstPiece.tuning_mode === "balanced") return "Balanced"
-                        if (firstPiece.tuning_mode === "tuned") return `${firstPiece.tuned_stat} Tuning` || "Tuned"
+                        if (isFlexible) return "Flexible Tuning"
                         return "No Tuning"
+                      }
+                      
+                      const getDescription = () => {
+                        if (firstPiece.tuning_mode === "balanced") {
+                          return "Balanced Tuning: +1 to 3 lowest stats"
+                        }
+                        if (isFlexible) {
+                          return "Can accept any +5/-5 tuning mod"
+                        }
+                        if (isExotic) {
+                          return firstPiece.arch.includes('Class Item') 
+                            ? 'Exotic Class Item with fixed stat distribution'
+                            : 'Exotic Armor: 30/20/13/5/5/5 base stats'
+                        }
+                        return "No tuning slot available"
                       }
                       
                       return (
@@ -194,29 +210,13 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                                   Tertiary: <StatIcon stat={firstPiece.tertiary} size={14} /> {firstPiece.tertiary}
                                 </span>
                               </div>
-                              {firstPiece.tuning_mode === "tuned" && firstPiece.tuned_stat && firstPiece.siphon_from && (
-                                <div className="text-sm text-orange-600 flex items-center gap-2">
-                                  <span className="flex items-center gap-1">
-                                    Tuned: +5 <StatIcon stat={firstPiece.tuned_stat} size={14} /> {firstPiece.tuned_stat}
-                                  </span>
-                                  <span>/</span>
-                                  <span className="flex items-center gap-1">
-                                    -5 <StatIcon stat={firstPiece.siphon_from} size={14} /> {firstPiece.siphon_from}
-                                  </span>
-                                </div>
-                              )}
-                              {firstPiece.tuning_mode === "balanced" && (
-                                <div className="text-sm text-blue-600">
-                                  Balanced Tuning: +1 to 3 lowest stats
-                                </div>
-                              )}
-                              {isExotic && (
-                                <div className="text-sm text-orange-600">
-                                  {firstPiece.arch.includes('Class Item') 
-                                    ? 'Exotic Class Item with fixed stat distribution'
-                                    : 'Exotic Armor: 30/20/13/5/5/5 base stats'}
-                                </div>
-                              )}
+                              <div className={`text-sm ${
+                                firstPiece.tuning_mode === "balanced" ? "text-blue-600" :
+                                isFlexible ? "text-green-600" :
+                                isExotic ? "text-orange-600" : "text-muted-foreground"
+                              }`}>
+                                {getDescription()}
+                              </div>
                             </div>
                             <Badge variant={getBadgeVariant()}>
                               {getBadgeText()}
@@ -257,6 +257,51 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                   })()}
                 </div>
               </div>
+
+              {/* Tuning Requirements Section */}
+              {solution.tuningRequirements && Object.keys(solution.tuningRequirements).length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-3">Tuning Requirements:</h4>
+                  <div className="space-y-2">
+                    {Object.entries(solution.tuningRequirements).map(([stat, count], index) => (
+                      <div key={index} className="p-2 border rounded-lg bg-orange-50 border-orange-200">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-orange-800">{count} x +5/-5 Tuning</span>
+                          <StatIcon stat={stat} size={16} />
+                          <span className="font-medium text-orange-800">{stat}</span>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="text-sm text-blue-800">
+                        <div className="font-medium mb-1">Tuning Allocation:</div>
+                        {(() => {
+                          const totalTuningNeeded = Object.values(solution.tuningRequirements).reduce((sum, count) => sum + count, 0)
+                          const flexiblePieces = solution.flexiblePieces || 0
+                          
+                          if (flexiblePieces >= totalTuningNeeded) {
+                            return (
+                              <p>
+                                ✅ You have <strong>{flexiblePieces}</strong> flexible pieces that can accept any +5/-5 tuning.
+                                <br />
+                                Only <strong>{totalTuningNeeded}</strong> tuning mod(s) needed, so you have options for allocation.
+                              </p>
+                            )
+                          } else {
+                            return (
+                              <p>
+                                ⚠️ You need <strong>{totalTuningNeeded}</strong> tuning mod(s) but only have <strong>{flexiblePieces}</strong> flexible piece(s).
+                                <br />
+                                This should not happen - please report this as a bug.
+                              </p>
+                            )
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Stat Distribution (if available) */}
               {solution.actualStats && (

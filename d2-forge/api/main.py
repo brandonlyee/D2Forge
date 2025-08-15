@@ -344,20 +344,29 @@ def calculate_actual_stats(sol, piece_stats):
 
 def format_solution(sol, deviation=0.0, desired_stats=None, piece_stats=None):
     armor_lines = []
-    mods = defaultdict(int)  # group +10 mods by stat only (hidden from piece lines)
+    mods = defaultdict(int)  # group +10 mods by stat only
+    tuning_requirements = defaultdict(int)  # track +5/-5 tuning requirements
+    flexible_pieces = 0  # count pieces that can accept any +5/-5 tuning
 
     # Group identical pieces by their string representation for display
     piece_groups = defaultdict(int)
     for p, count in sol.items():
         if p.tuning_mode == "balanced":
             prefix = "[EXOTIC] " if str(p.arch).lower().startswith("exotic ") else ""
-            key = f"{prefix}{p.arch} (tertiary={p.tertiary}) (tuning=ANY) Balanced Tuning (+1 to 3 lowest stats)"
+            key = f"{prefix}{p.arch} (tertiary={p.tertiary}) Balanced Tuning (+1 to 3 lowest stats)"
         elif p.tuning_mode == "tuned":
             prefix = "[EXOTIC] " if str(p.arch).lower().startswith("exotic ") else ""
-            key = f"{prefix}{p.arch} (tertiary={p.tertiary}) (tuning={p.tuned_stat}) +{p.tuned_stat}/-{p.siphon_from}"
+            key = f"{prefix}{p.arch} (tertiary={p.tertiary}) No specific tuning required"
+            # Track the tuning requirement separately
+            tuning_requirements[p.tuned_stat] += count
+            # This piece can be flexible for other tuning needs
+            flexible_pieces += count
         else:
             prefix = "[EXOTIC] " if str(p.arch).lower().startswith("exotic ") else ""
-            key = f"{prefix}{p.arch} (tertiary={p.tertiary}) (tuning=ANY) No Tuning"
+            key = f"{prefix}{p.arch} (tertiary={p.tertiary}) No tuning required"
+            # Non-exotic, non-balanced pieces can accept any +5/-5 tuning
+            if not str(p.arch).lower().startswith("exotic "):
+                flexible_pieces += count
         piece_groups[key] += count
         mods[p.mod_target] += count
 
@@ -370,6 +379,18 @@ def format_solution(sol, deviation=0.0, desired_stats=None, piece_stats=None):
     lines.append("\nMods:")
     for stat, cnt in mods.items():
         lines.append(f"{cnt}x +10->{stat}")
+
+    # Add tuning requirements section if there are any +5/-5 tunings needed
+    if tuning_requirements:
+        lines.append("\nTuning Requirements:")
+        total_tuning_needed = sum(tuning_requirements.values())
+        for stat, cnt in tuning_requirements.items():
+            lines.append(f"{cnt}x +5/-5 Tuning -> {stat}")
+        lines.append(f"\nNote: {total_tuning_needed} total +5/-5 tuning mod(s) needed.")
+        if flexible_pieces >= total_tuning_needed:
+            lines.append(f"You have {flexible_pieces} piece(s) that can accept any +5/-5 tuning.")
+        else:
+            lines.append(f"Warning: Only {flexible_pieces} flexible piece(s) available for {total_tuning_needed} tuning requirement(s).")
 
     if deviation and deviation > 0:
         lines.append(f"\nTotal deviation from desired stats: {deviation:.1f}")
