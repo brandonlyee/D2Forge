@@ -118,7 +118,7 @@ export default function Home() {
                 <img 
                   src="/d2-forge.svg" 
                   alt="D2 Forge Logo" 
-                  className="w-12 h-12"
+                  className="w-12 h-12 filter dark:invert-0 invert"
                 />
                 <h1 className="text-4xl font-bold tracking-tight">
                   D2 Forge

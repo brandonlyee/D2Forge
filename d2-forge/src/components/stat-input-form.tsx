@@ -291,6 +291,38 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
               ))}
             </div>
 
+            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Total Stats:</span>
+                <Badge variant={totalStats > maxPossibleStats ? "destructive" : "default"}>
+                  {totalStats}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <span>Max Possible: {maxPossibleStats}</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="inline-flex">
+                        <Info className="h-3 w-3" suppressHydrationWarning />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-sm">
+                      <p>Assuming all Tier 5 armor, five +10 Stat mods,<br />and five Balanced Tuning mods, 515 is the<br />maximum amount of stats that can be<br />provided by a set of armor.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </div>
+
+            {totalStats > maxPossibleStats && (
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  ⚠️ Your desired stats exceed the maximum possible. The optimizer will find the closest approximation.
+                </p>
+              </div>
+            )}
+
             <div className="border-t pt-4 space-y-4">
               <FormField
                 control={form.control}
@@ -479,38 +511,6 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
                 </div>
               )}
             </div>
-
-            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Total Stats:</span>
-                <Badge variant={totalStats > maxPossibleStats ? "destructive" : "default"}>
-                  {totalStats}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                <span>Max Possible: {maxPossibleStats}</span>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button type="button" className="inline-flex">
-                        <Info className="h-3 w-3" suppressHydrationWarning />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-sm">
-                      <p>Assuming all Tier 5 armor, five +10 Stat mods,<br />and five Balanced Tuning mods, 515 is the<br />maximum amount of stats that can be<br />provided by a set of armor.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-            </div>
-
-            {totalStats > maxPossibleStats && (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-800">
-                  ⚠️ Your desired stats exceed the maximum possible. The optimizer will find the closest approximation.
-                </p>
-              </div>
-            )}
 
             <Button 
               type="submit" 

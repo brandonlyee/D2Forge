@@ -86,6 +86,8 @@ class handler(BaseHTTPRequestHandler):
                 for sol, deviation in zip(solutions_list, deviations_list):
                     # Convert piece types to JSON strings for frontend consumption
                     pieces_dict = {}
+                    tuning_requirements = {}
+                    flexible_pieces = 0
                     
                     for piece_type, count in sol.items():
                         # Convert PieceType namedtuple to dict then to JSON string
@@ -98,6 +100,21 @@ class handler(BaseHTTPRequestHandler):
                             'siphon_from': piece_type.siphon_from
                         }
                         pieces_dict[json.dumps(piece_dict)] = count
+                        
+                        # Track tuning requirements separately
+                        if piece_type.tuning_mode == "tuned":
+                            # Store as {stat: [{"count": count, "siphon_from": stat}, ...]}
+                            if piece_type.tuned_stat not in tuning_requirements:
+                                tuning_requirements[piece_type.tuned_stat] = []
+                            tuning_requirements[piece_type.tuned_stat].append({
+                                "count": count,
+                                "siphon_from": piece_type.siphon_from
+                            })
+                            # This piece can accept flexible tuning
+                            flexible_pieces += count
+                        elif piece_type.tuning_mode == "none" and not str(piece_type.arch).lower().startswith("exotic "):
+                            # Non-exotic, non-balanced pieces can accept any +5/-5 tuning
+                            flexible_pieces += count
                     
                     # Calculate actual stats achieved by this solution
                     actual_stats = calculate_actual_stats(sol, piece_stats)
@@ -105,7 +122,9 @@ class handler(BaseHTTPRequestHandler):
                     formatted_solutions.append({
                         "pieces": pieces_dict,
                         "deviation": float(deviation),
-                        "actualStats": actual_stats
+                        "actualStats": actual_stats,
+                        "tuningRequirements": tuning_requirements,
+                        "flexiblePieces": flexible_pieces
                     })
                 
                 response = {

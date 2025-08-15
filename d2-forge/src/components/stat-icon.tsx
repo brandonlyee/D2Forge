@@ -39,7 +39,7 @@ export function StatIcon({ stat, size = 24, className = "" }: StatIconProps) {
       alt={`${statToUse} icon`}
       width={size}
       height={size}
-      className={`inline-block ${className}`}
+      className={`inline-block filter dark:invert-0 invert ${className}`}
       suppressHydrationWarning
     />
   )
