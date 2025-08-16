@@ -138,7 +138,6 @@ export default function ChecklistsPage() {
                 </CardContent>
               </Card>
             </div>
-          </div>
 
           {/* Checklists Content */}
           {checklistArray.length === 0 ? (
