@@ -401,8 +401,20 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
                 render={({ field }) => (
                   <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
-                      <FormLabel className="text-base font-medium">
+                      <FormLabel className="text-base font-medium flex items-center gap-2">
                         Use Exotic Armor
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button type="button" className="inline-flex">
+                                <Info className="h-4 w-4" suppressHydrationWarning />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-56">
+                              <p>Forces the use of one exotic armor piece of any archetype. Assumes a maximum stat roll of 63 (30/20/13).</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </FormLabel>
                       <div className="text-sm text-muted-foreground">
                         Include one exotic armor piece in the build (30/20/13 stat distribution).
