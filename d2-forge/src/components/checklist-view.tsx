@@ -204,7 +204,12 @@ export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewPr
                   </div>
                   {item.isCompleted && (
                     <Badge variant="default" className="text-xs">
-                      {item.assignedSlot?.charAt(0).toUpperCase()}{item.assignedSlot?.slice(1)}
+                      {item.assignedSlot === 'class' 
+                        ? 'Class Item' 
+                        : item.assignedSlot 
+                          ? item.assignedSlot.charAt(0).toUpperCase() + item.assignedSlot.slice(1)
+                          : ''
+                      }
                     </Badge>
                   )}
                 </div>
@@ -244,15 +249,17 @@ export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewPr
               <div
                 key={mod.id}
                 className={`flex items-center gap-2 p-2 border rounded cursor-pointer transition-colors ${
-                  mod.isCompleted ? 'bg-green-50 border-green-200' : 'hover:bg-gray-50'
+                  mod.isCompleted 
+                    ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
+                    : 'hover:bg-muted/50 dark:hover:bg-muted/20'
                 }`}
                 onClick={() => handleModToggle(mod.id)}
               >
                 <input
                   type="checkbox"
                   checked={mod.isCompleted}
-                  onChange={() => handleModToggle(mod.id)}
-                  className="h-4 w-4"
+                  onChange={() => {}} // Remove handler to prevent conflicts
+                  className="h-4 w-4 pointer-events-none" // Disable direct clicking on checkbox
                 />
                 <span className={mod.isCompleted ? 'line-through text-muted-foreground' : ''}>
                   +10 <StatIcon stat={mod.stat} size={16} className="inline mx-1" /> {mod.stat} Mod
