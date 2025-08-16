@@ -70,7 +70,7 @@ CLASS_ITEM_ROLLS = {
     # Spirit of the Dragon Rolls
     ("Spirit of the Dragon", "Spirit of the Star-Eater"): ("Class", "Weapons", "Super"),
     # ("Spirit of the Dragon", "Spirit of Synthoceps"): ("Class", "Weapons", "Health"),  # Guess, needs validation
-    # ("Spirit of the Dragon", "Spirit of Verity"): ("Class", "Weapons", "Grenade"),  # Guess, needs validation
+    ("Spirit of the Dragon", "Spirit of Verity"): ("Class", "Weapons", "Grenade"),
     # ("Spirit of the Dragon", "Spirit of Cyrtarachne"): ("Class", "Weapons", "Grenade"),  # Guess, needs validation
     # ("Spirit of the Dragon", "Spirit of the Gyrfalcon"): ("Class", "Weapons", "Weapons"),  # Guess, needs validation
     # ("Spirit of the Dragon", "Spirit of the Liar"): ("Class", "Weapons", "Class"),  # Guess, needs validation
@@ -113,7 +113,7 @@ CLASS_ITEM_ROLLS = {
     # ("Spirit of Renewal", "Spirit of Verity"): ("Grenade", "Super", "Weapons"),  # Guess, needs validation
     ("Spirit of Renewal", "Spirit of Cyrtarachne"): ("Grenade", "Super", "Health"),
     # ("Spirit of Renewal", "Spirit of the Gyrfalcon"): ("Grenade", "Super", "Weapons"),  # Guess, needs validation
-    # ("Spirit of Renewal", "Spirit of the Liar"): ("Grenade", "Super", "Class"),  # Guess, needs validation
+    ("Spirit of Renewal", "Spirit of the Liar"): ("Grenade", "Super", "Melee"),
     # ("Spirit of Renewal", "Spirit of the Wormhusk"): ("Grenade", "Super", "Class"),  # Guess, needs validation
     ("Spirit of Renewal", "Spirit of the Coyote"): ("Grenade", "Super", "Class"),
 

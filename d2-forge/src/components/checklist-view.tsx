@@ -1,6 +1,6 @@
 "use client"
 
-import React from 'react'
+import React, { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -9,7 +9,7 @@ import { TuningDropdown } from '@/components/tuning-dropdown'
 import { StatIcon } from '@/components/stat-icon'
 import { ChecklistState, ArmorSlot } from '@/types/checklist'
 import { saveChecklist } from '@/lib/checklist-utils'
-import { Copy, Trash2 } from 'lucide-react'
+import { Copy, Trash2, X } from 'lucide-react'
 
 interface ChecklistViewProps {
   checklist: ChecklistState
@@ -18,6 +18,7 @@ interface ChecklistViewProps {
 }
 
 export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewProps) {
+  const [deleteState, setDeleteState] = useState<'idle' | 'confirming'>('idle')
   
   const handleSlotSelect = (itemId: string, slot: ArmorSlot) => {
     const updatedChecklist = { ...checklist }
@@ -123,9 +124,15 @@ export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewPr
   }
 
   const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this checklist?')) {
+    if (deleteState === 'idle') {
+      setDeleteState('confirming')
+    } else {
       onDelete(checklist.id)
     }
+  }
+
+  const handleCancelDelete = () => {
+    setDeleteState('idle')
   }
 
   // Calculate progress (excluding mods from completion calculation)
@@ -160,10 +167,22 @@ export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewPr
               <Copy className="h-4 w-4 mr-1" />
               Copy
             </Button>
-            <Button variant="destructive" size="sm" onClick={handleDelete}>
-              <Trash2 className="h-4 w-4 mr-1" />
-              Delete
-            </Button>
+{deleteState === 'confirming' ? (
+              <div className="flex gap-2">
+                <Button variant="destructive" size="sm" onClick={handleDelete}>
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Confirm Delete
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleCancelDelete}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <Button variant="outline" size="sm" onClick={handleDelete}>
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete
+              </Button>
+            )}
           </div>
         </div>
       </CardHeader>

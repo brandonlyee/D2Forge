@@ -40,6 +40,49 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
   const [buttonStates, setButtonStates] = useState<Record<number, 'idle' | 'editing' | 'saving' | 'saved'>>({})
   const [editingNames, setEditingNames] = useState<Record<number, string>>({})
 
+  // Create a unique identifier for a solution
+  const getSolutionId = (solution: Solution) => {
+    return JSON.stringify(solution.pieces)
+  }
+
+  // Load saved solution states from sessionStorage
+  const loadSavedSolutions = (): Set<string> => {
+    try {
+      const saved = sessionStorage.getItem('d2forge-saved-solutions')
+      return new Set(saved ? JSON.parse(saved) : [])
+    } catch {
+      return new Set()
+    }
+  }
+
+  // Save solution as saved to sessionStorage
+  const markSolutionAsSaved = (solutionId: string) => {
+    try {
+      const savedSolutions = loadSavedSolutions()
+      savedSolutions.add(solutionId)
+      sessionStorage.setItem('d2forge-saved-solutions', JSON.stringify(Array.from(savedSolutions)))
+    } catch (error) {
+      console.warn('Failed to save solution state:', error)
+    }
+  }
+
+  // Initialize button states based on saved solutions
+  React.useEffect(() => {
+    const savedSolutions = loadSavedSolutions()
+    const initialStates: Record<number, 'idle' | 'editing' | 'saving' | 'saved'> = {}
+    
+    solutions.forEach((solution, index) => {
+      const solutionId = getSolutionId(solution)
+      if (savedSolutions.has(solutionId)) {
+        initialStates[index] = 'saved'
+      } else {
+        initialStates[index] = 'idle'
+      }
+    })
+    
+    setButtonStates(initialStates)
+  }, [solutions])
+
   const handleStartEdit = (solutionIndex: number) => {
     setButtonStates(prev => ({ ...prev, [solutionIndex]: 'editing' }))
     setEditingNames(prev => ({ 
@@ -71,6 +114,10 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
       checklist.name = finalName
       saveChecklist(checklist)
       
+      // Mark solution as saved persistently
+      const solutionId = getSolutionId(solution)
+      markSolutionAsSaved(solutionId)
+      
       // Clear editing state
       setEditingNames(prev => {
         const updated = { ...prev }
@@ -78,13 +125,8 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
         return updated
       })
       
-      // Set saved state
+      // Set saved state permanently (no more auto-reset)
       setButtonStates(prev => ({ ...prev, [solutionIndex]: 'saved' }))
-      
-      // Reset to idle after 3 seconds
-      setTimeout(() => {
-        setButtonStates(prev => ({ ...prev, [solutionIndex]: 'idle' }))
-      }, 3000)
       
     } catch (error) {
       console.error('Failed to create checklist:', error)
@@ -195,10 +237,10 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                         variant="default"
                         size="sm"
                         disabled
-                        className="flex items-center gap-2 bg-green-600 hover:bg-green-600 transition-all duration-300 animate-pulse"
+                        className="flex items-center gap-2 bg-green-600 hover:bg-green-600 transition-all duration-300"
                       >
                         <Check className="h-4 w-4" />
-                        Build Saved!
+                        Saved to Checklist
                       </Button>
                     )
                   }

@@ -22,10 +22,10 @@ const STAT_NAMES = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"] a
 const EXOTIC_PERK_MAPPING = {
   "Spirit of the Assassin": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity"],
   "Spirit of Inmost Light": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of Cyrtarachne", "Spirit of the Gyrfalcon", "Spirit of the Wormhusk", "Spirit of the Coyote"],
-  "Spirit of the Dragon": ["Spirit of the Star-Eater", "Spirit of the Coyote"],
+  "Spirit of the Dragon": ["Spirit of the Star-Eater", "Spirit of the Coyote", "Spirit of Verity"],
   "Spirit of the Foe Tracer": ["Spirit of the Star-Eater"],
   "Spirit of Caliban": ["Spirit of Synthoceps", "Spirit of Cyrtarachne", "Spirit of the Liar"],
-  "Spirit of Renewal": ["Spirit of Cyrtarachne", "Spirit of the Coyote"],
+  "Spirit of Renewal": ["Spirit of Cyrtarachne", "Spirit of the Coyote", "Spirit of the Liar"],
   "Spirit of Severance": ["Spirit of Synthoceps"],
   "Spirit of the Eternal Warrior": ["Spirit of the Star-Eater", "Spirit of Synthoceps"],
   "Spirit of the Abeyant": ["Spirit of Synthoceps"],
