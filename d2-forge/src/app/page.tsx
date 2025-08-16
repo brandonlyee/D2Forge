@@ -45,44 +45,38 @@ export default function Home() {
     Class: 75,
     Weapons: 25,
   })
-  const [formState, setFormState] = useState<Partial<FormData> | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Restore state from sessionStorage on component mount
+  // Restore solutions and desiredStats from sessionStorage on component mount
   useEffect(() => {
     try {
       const savedState = sessionStorage.getItem('d2forge-main-state')
       if (savedState) {
-        const { solutions: savedSolutions, desiredStats: savedStats, formState: savedFormState } = JSON.parse(savedState)
+        const { solutions: savedSolutions, desiredStats: savedStats } = JSON.parse(savedState)
         if (savedSolutions) setSolutions(savedSolutions)
         if (savedStats) setDesiredStats(savedStats)
-        if (savedFormState) setFormState(savedFormState)
       }
     } catch (error) {
       console.warn('Failed to restore main page state:', error)
     }
   }, [])
 
-  // Save state to sessionStorage whenever state changes
+  // Save solutions and desiredStats to sessionStorage whenever they change
   useEffect(() => {
     try {
       sessionStorage.setItem('d2forge-main-state', JSON.stringify({
         solutions,
-        desiredStats,
-        formState
+        desiredStats
       }))
     } catch (error) {
       console.warn('Failed to save main page state:', error)
     }
-  }, [solutions, desiredStats, formState])
+  }, [solutions, desiredStats])
 
   const handleSubmit = async (data: FormData) => {
     setIsLoading(true)
     setError(null) // Clear previous errors
-    
-    // Save the form state for restoration
-    setFormState(data)
     
     // Extract only the stat values for display, excluding optimization options
     const { 
@@ -184,7 +178,6 @@ export default function Home() {
               <StatInputForm 
                 onSubmit={handleSubmit} 
                 isLoading={isLoading} 
-                initialValues={formState || undefined}
               />
             </div>
 

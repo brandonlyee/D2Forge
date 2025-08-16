@@ -119,7 +119,7 @@ interface StatInputFormProps {
 }
 
 export function StatInputForm({ onSubmit, isLoading = false, initialValues }: StatInputFormProps) {
-  const defaultValues = {
+  const defaultValues = React.useMemo(() => ({
     Health: 150,
     Melee: 75,
     Grenade: 75,
@@ -138,25 +138,56 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
     use_class_item_exotic: false,
     exotic_perk1: '',
     exotic_perk2: '',
+  }), [])
+
+  // Load persisted state from sessionStorage first
+  const loadPersistedState = (): Partial<FormData> => {
+    try {
+      const saved = sessionStorage.getItem('d2forge-form-state')
+      return saved ? JSON.parse(saved) : {}
+    } catch {
+      return {}
+    }
+  }
+
+  // Save state to sessionStorage
+  const saveFormState = (data: Partial<FormData>) => {
+    try {
+      sessionStorage.setItem('d2forge-form-state', JSON.stringify(data))
+    } catch (error) {
+      console.warn('Failed to save form state:', error)
+    }
   }
   
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       ...defaultValues,
+      ...loadPersistedState(),
       ...initialValues
     },
   })
 
-  // Reset form when initialValues change
+  // Reset form when initialValues change (but preserve persisted state if no initialValues)
   React.useEffect(() => {
-    if (initialValues) {
-      form.reset({
+    if (initialValues && Object.keys(initialValues).length > 0) {
+      const newValues = {
         ...defaultValues,
+        ...loadPersistedState(),
         ...initialValues
-      })
+      }
+      form.reset(newValues)
+      saveFormState(newValues)
     }
-  }, [initialValues, form])
+  }, [initialValues, form, defaultValues])
+
+  // Save form state on every change
+  React.useEffect(() => {
+    const subscription = form.watch((value) => {
+      saveFormState(value as FormData)
+    })
+    return () => subscription.unsubscribe()
+  }, [form])
 
   const watchedValues = form.watch()
   const totalStats = STAT_NAMES.reduce((sum, statName) => sum + (watchedValues[statName] || 0), 0)
