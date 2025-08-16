@@ -245,10 +245,11 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
 
   return (
     <Card className="w-full max-w-2xl">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <span className="text-2xl">⚔️</span>
-          Destiny 2 Stat Optimizer
+      <CardHeader className="pb-4 sm:pb-6">
+        <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+          <span className="text-xl sm:text-2xl">⚔️</span>
+          <span className="hidden sm:inline">Destiny 2 Stat Optimizer</span>
+          <span className="sm:hidden">D2 Optimizer</span>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -256,20 +257,20 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
                   <Info className="h-4 w-4" suppressHydrationWarning />
                 </button>
               </TooltipTrigger>
-              <TooltipContent className="max-w-xs">
-                <p>Currently, we are not accounting for stat modifications from Subclass Fragments, or Fonts.<br />Please input your desired stats accordingly.</p>
+              <TooltipContent className="max-w-56">
+                <p>Currently, we are not accounting for stat modifications from Subclass Fragments, or Fonts. Please input your desired stats accordingly.</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-sm">
           Enter your desired stat distribution. The optimizer will find the best armor combinations.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-0">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {STAT_NAMES.map((statName) => (
                 <FormField
                   key={statName}
@@ -309,14 +310,15 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
                       </FormLabel>
                       <FormControl>
                         <div className="space-y-3">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2 sm:gap-3">
                             <Input
                               type="number"
                               min={0}
                               max={225}
-                              className="w-20"
+                              className="w-16 sm:w-20 text-sm"
                               {...field}
                               onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              inputMode="numeric"
                             />
                             <div className="flex-1">
                               <Slider
@@ -371,17 +373,17 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
               </div>
             )}
 
-            <div className="border-t pt-4 space-y-4">
+            <div className="border-t pt-4 space-y-3 sm:space-y-4">
               <FormField
                 control={form.control}
                 name="allow_tuned"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base font-medium">
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 sm:p-4">
+                    <div className="space-y-0.5 pr-2">
+                      <FormLabel className="text-sm sm:text-base font-medium">
                         Allow +5/-5 Tuning Mods
                       </FormLabel>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-xs sm:text-sm text-muted-foreground">
                         Include armor pieces with +5/-5 stat tuning. These are harder to farm but provide more optimization options.
                       </div>
                     </div>
@@ -399,9 +401,9 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
                 control={form.control}
                 name="use_exotic"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base font-medium flex items-center gap-2">
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 sm:p-4">
+                    <div className="space-y-0.5 pr-2">
+                      <FormLabel className="text-sm sm:text-base font-medium flex items-center gap-2">
                         Use Exotic Armor
                         <TooltipProvider>
                           <Tooltip>
@@ -416,7 +418,7 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
                           </Tooltip>
                         </TooltipProvider>
                       </FormLabel>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-xs sm:text-sm text-muted-foreground">
                         Include one exotic armor piece in the build (30/20/13 stat distribution).
                       </div>
                     </div>
@@ -574,16 +576,20 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
 
             <Button 
               type="submit" 
-              className="w-full" 
+              className="w-full h-12 sm:h-10 text-sm sm:text-base font-medium" 
               disabled={isLoading || hasMissingPerks() || (watchedValues.use_exotic && watchedValues.use_class_item_exotic && !isValidPerkCombination())}
             >
               {isLoading ? (
                 <>
                   <span className="animate-spin mr-2">⏳</span>
-                  Optimizing...
+                  <span className="hidden sm:inline">Optimizing...</span>
+                  <span className="sm:hidden">Optimizing...</span>
                 </>
               ) : (
-                'Find Optimal Builds'
+                <>
+                  <span className="hidden sm:inline">Find Optimal Builds</span>
+                  <span className="sm:hidden">Optimize</span>
+                </>
               )}
             </Button>
           </form>

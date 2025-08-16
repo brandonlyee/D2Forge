@@ -236,14 +236,15 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
   }
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-4 sm:space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-500" suppressHydrationWarning />
-            Optimal Armor Builds Found
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" suppressHydrationWarning />
+            <span className="hidden sm:inline">Optimal Armor Builds Found</span>
+            <span className="sm:hidden">Builds Found</span>
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             {solutions.length} solution{solutions.length !== 1 ? 's' : ''} found within the time limit, ranked by farming difficulty
           </CardDescription>
         </CardHeader>
@@ -251,19 +252,23 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
 
       {solutions.map((solution, index) => (
         <Card key={index}>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">
-                Solution {index + 1}
-                {solution.deviation === 0 ? (
-                  <Badge className="ml-2" variant="default">Exact Match</Badge>
-                ) : (
-                  <Badge className="ml-2" variant="secondary">
-                    ~{solution.deviation.toFixed(1)} deviation score
-                  </Badge>
-                )}
-              </CardTitle>
-<div className="flex items-center gap-2">
+          <CardHeader className="pb-3 sm:pb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="space-y-2">
+                <CardTitle className="text-base sm:text-lg">
+                  Solution {index + 1}
+                </CardTitle>
+                <div>
+                  {solution.deviation === 0 ? (
+                    <Badge variant="default" className="text-xs">Exact Match</Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-xs">
+                      ~{solution.deviation.toFixed(1)} deviation score
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-start sm:self-center">
                 {(() => {
                   const state = buttonStates[index] || 'idle'
                   
@@ -271,10 +276,11 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                     return (
                       <button
                         disabled
-                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-green-600 border border-green-600 rounded-md transition-all duration-300 cursor-not-allowed"
+                        className="flex items-center gap-2 px-3 py-2 sm:py-1.5 text-xs sm:text-sm font-medium text-white bg-green-600 border border-green-600 rounded-md transition-all duration-300 cursor-not-allowed"
                       >
                         <Check className="h-4 w-4" />
-                        Saved to Checklist
+                        <span className="hidden sm:inline">Saved to Checklist</span>
+                        <span className="sm:hidden">Saved</span>
                       </button>
                     )
                   }
@@ -285,7 +291,7 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                         <Input
                           value={editingNames[index] || ''}
                           onChange={(e) => setEditingNames(prev => ({ ...prev, [index]: e.target.value }))}
-                          className="h-8 text-sm"
+                          className="h-10 sm:h-8 text-sm flex-1 min-w-0"
                           placeholder="Enter build name..."
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -300,7 +306,7 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                           variant="outline"
                           size="sm"
                           onClick={() => handleSaveChecklist(index)}
-                          className="h-8 px-2"
+                          className="h-10 sm:h-8 px-3 sm:px-2"
                         >
                           <Check className="h-4 w-4" />
                         </Button>
@@ -308,7 +314,7 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                           variant="outline"
                           size="sm"
                           onClick={() => handleCancelEdit(index)}
-                          className="h-8 px-2"
+                          className="h-10 sm:h-8 px-3 sm:px-2"
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -322,21 +328,22 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                       size="sm"
                       onClick={() => handleStartEdit(index)}
                       disabled={state === 'saving'}
-                      className="flex items-center gap-2 transition-all duration-200"
+                      className="flex items-center gap-2 h-10 sm:h-8 px-3 sm:px-2 text-xs sm:text-sm transition-all duration-200"
                     >
                       <ClipboardList className={`h-4 w-4 ${state === 'saving' ? 'animate-spin' : ''}`} />
-                      {state === 'saving' ? 'Saving...' : 'Add to Checklist'}
+                      <span className="hidden sm:inline">{state === 'saving' ? 'Saving...' : 'Add to Checklist'}</span>
+                      <span className="sm:hidden">{state === 'saving' ? 'Saving...' : 'Add'}</span>
                     </Button>
                   )
                 })()}
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+          <CardContent className="pt-0">
+            <div className="space-y-4 sm:space-y-6">
               {/* Armor Pieces */}
               <div>
-                <h4 className="font-medium mb-3">Armor Pieces:</h4>
+                <h4 className="font-medium mb-3 text-sm sm:text-base">Armor Pieces:</h4>
                 <div className="space-y-2">
                   {(() => {
                     // Group pieces by arch and tertiary only (ignoring tuning specifics)
@@ -402,19 +409,28 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                       
                       return (
                         <div key={groupIndex} className="p-3 border rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="font-medium flex items-center gap-2">
-                                {isExotic && <span className="text-orange-500">✨</span>}
-                                <StatIcon stat={firstPiece.arch.replace('Exotic ', '')} size={20} />
-                                {group.totalCount} x {firstPiece.arch} {isExotic ? '' : 'Armor'}
+                          <div className="space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium flex items-center gap-2 text-sm">
+                                  {isExotic && <span className="text-orange-500">✨</span>}
+                                  <StatIcon stat={firstPiece.arch.replace('Exotic ', '')} size={18} />
+                                  <span className="truncate">
+                                    {group.totalCount} x {firstPiece.arch} {isExotic ? '' : 'Armor'}
+                                  </span>
+                                </div>
                               </div>
+                              <Badge variant={getBadgeVariant()} className="shrink-0 text-xs">
+                                {getBadgeText()}
+                              </Badge>
+                            </div>
+                            <div className="space-y-1">
                               <div className="text-sm text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   Tertiary: <StatIcon stat={firstPiece.tertiary} size={14} /> {firstPiece.tertiary}
                                 </span>
                               </div>
-                              <div className={`text-sm ${
+                              <div className={`text-sm ${ 
                                 firstPiece.tuning_mode === "balanced" ? "text-blue-600" :
                                 isFlexible ? "text-green-600" :
                                 isExotic ? "text-orange-600" : "text-muted-foreground"
@@ -422,9 +438,6 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                                 {getDescription()}
                               </div>
                             </div>
-                            <Badge variant={getBadgeVariant()}>
-                              {getBadgeText()}
-                            </Badge>
                           </div>
                         </div>
                       )
@@ -464,25 +477,27 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
 
               {/* Tuning Requirements Section */}
               <div>
-                <h4 className="font-medium mb-3">Tuning Requirements:</h4>
+                <h4 className="font-medium mb-3 text-sm sm:text-base">Tuning Requirements:</h4>
                 <div className="space-y-2">
                   {solution.tuningRequirements && Object.keys(solution.tuningRequirements).length > 0 ? (
                     <>
                       {Object.entries(solution.tuningRequirements).map(([stat, tuningDetails], index) => (
                         <div key={index}>
                           {tuningDetails.map((detail, detailIndex) => (
-                            <div key={detailIndex} className="p-2 border rounded-lg bg-muted/50 mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium flex items-center gap-1">
+                            <div key={detailIndex} className="p-3 border rounded-lg bg-muted/50 mb-2">
+                              <div className="space-y-2">
+                                <div className="font-medium flex items-center gap-1 text-sm">
                                   {detail.count} x <StatIcon stat={stat} size={16} /> {stat} Tuning:
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  +5 <StatIcon stat={stat} size={16} /> {stat}
-                                </span>
-                                <span>/</span>
-                                <span className="flex items-center gap-1">
-                                  -5 <StatIcon stat={detail.siphon_from} size={16} /> {detail.siphon_from}
-                                </span>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2 text-sm">
+                                  <span className="flex items-center gap-1 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded">
+                                    +5 <StatIcon stat={stat} size={14} /> {stat}
+                                  </span>
+                                  <span className="text-muted-foreground">/</span>
+                                  <span className="flex items-center gap-1 bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded">
+                                    -5 <StatIcon stat={detail.siphon_from} size={14} /> {detail.siphon_from}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -535,42 +550,45 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
               {/* Stat Distribution (if available) */}
               {solution.actualStats && (
                 <div>
-                  <h4 className="font-medium mb-3">Stat Distribution:</h4>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Stat</TableHead>
-                        <TableHead>Actual</TableHead>
-                        <TableHead>Desired</TableHead>
-                        <TableHead>Difference</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {STAT_NAMES.map((statName, statIndex) => {
-                        const actual = solution.actualStats![statIndex]
-                        const desired = desiredStats[statName]
-                        const diff = actual - desired
-                        
-                        return (
-                          <TableRow key={statName}>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <StatIcon stat={statName} size={16} />
-                                {statName}
-                              </div>
-                            </TableCell>
-                            <TableCell>{actual}</TableCell>
-                            <TableCell>{desired}</TableCell>
-                            <TableCell>
-                              <span className={diff === 0 ? "text-green-600" : diff > 0 ? "text-blue-600" : "text-red-600"}>
-                                {diff > 0 ? '+' : ''}{diff}
-                              </span>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })}
-                    </TableBody>
-                  </Table>
+                  <h4 className="font-medium mb-3 text-sm sm:text-base">Stat Distribution:</h4>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs sm:text-sm">Stat</TableHead>
+                          <TableHead className="text-xs sm:text-sm">Actual</TableHead>
+                          <TableHead className="text-xs sm:text-sm">Desired</TableHead>
+                          <TableHead className="text-xs sm:text-sm">Difference</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {STAT_NAMES.map((statName, statIndex) => {
+                          const actual = solution.actualStats![statIndex]
+                          const desired = desiredStats[statName]
+                          const diff = actual - desired
+                          
+                          return (
+                            <TableRow key={statName}>
+                              <TableCell className="font-medium text-xs sm:text-sm">
+                                <div className="flex items-center gap-1 sm:gap-2">
+                                  <StatIcon stat={statName} size={14} />
+                                  <span className="hidden sm:inline">{statName}</span>
+                                  <span className="sm:hidden">{statName.slice(0, 3)}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-xs sm:text-sm">{actual}</TableCell>
+                              <TableCell className="text-xs sm:text-sm">{desired}</TableCell>
+                              <TableCell className="text-xs sm:text-sm">
+                                <span className={diff === 0 ? "text-green-600" : diff > 0 ? "text-blue-600" : "text-red-600"}>
+                                  {diff > 0 ? '+' : ''}{diff}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               )}
             </div>

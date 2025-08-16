@@ -136,35 +136,35 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-7xl mx-auto space-y-8">
+      <div className="container mx-auto px-4 py-4 sm:py-8">
+        <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
           {/* Header */}
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {/* Mobile and Desktop Navigation */}
             <div className="flex justify-end items-center gap-2">
               <Link href="/checklists">
-                <Button variant="outline" size="sm" className="w-auto px-3">
-                  <ClipboardList className="h-4 w-4 mr-2" />
+                <Button variant="outline" size="sm" className="h-8 sm:h-9 px-2 sm:px-3">
+                  <ClipboardList className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">My Checklists</span>
-                  <span className="sm:hidden">Checklists</span>
+                  <span className="sm:hidden sr-only">Checklists</span>
                 </Button>
               </Link>
               <ThemeToggle />
             </div>
 
             {/* Title and Description */}
-            <div className="text-center space-y-4 pt-4">
-              <div className="flex items-center justify-center gap-3">
+            <div className="text-center space-y-3 sm:space-y-4 pt-2 sm:pt-4">
+              <div className="flex items-center justify-center gap-2 sm:gap-3">
                 <img 
                   src="/d2-forge.svg" 
                   alt="D2 Forge Logo" 
-                  className="w-10 h-10 sm:w-12 sm:h-12"
+                  className="w-8 h-8 sm:w-12 sm:h-12"
                 />
                 <h1 className="text-2xl sm:text-4xl font-bold tracking-tight">
                   D2 Forge
                 </h1>
               </div>
-              <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
+              <p className="text-sm sm:text-xl text-muted-foreground max-w-2xl mx-auto px-2 sm:px-4">
                 Forge optimal Destiny 2 armor builds to achieve your desired stat distribution 
                 using Mixed Integer Linear Programming.
               </p>
@@ -172,7 +172,7 @@ export default function Home() {
           </div>
 
           {/* Main Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-8">
             {/* Stat Input Form */}
             <div className="lg:col-span-2">
               <StatInputForm 
