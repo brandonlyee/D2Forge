@@ -37,7 +37,25 @@ interface SolutionDisplayProps {
 const STAT_NAMES = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"]
 
 export function SolutionDisplay({ solutions, desiredStats, isLoading = false, error = null }: SolutionDisplayProps) {
-  const [buttonStates, setButtonStates] = useState<Record<number, 'idle' | 'editing' | 'saving' | 'saved'>>({})
+  // Load saved solution states from sessionStorage synchronously for initial render
+  const getInitialButtonStates = (): Record<number, 'idle' | 'editing' | 'saving' | 'saved'> => {
+    try {
+      const saved = sessionStorage.getItem('d2forge-saved-solutions')
+      const savedSolutions = new Set(saved ? JSON.parse(saved) : [])
+      const initialStates: Record<number, 'idle' | 'editing' | 'saving' | 'saved'> = {}
+      
+      solutions.forEach((solution, index) => {
+        const solutionId = JSON.stringify(solution.pieces)
+        initialStates[index] = savedSolutions.has(solutionId) ? 'saved' : 'idle'
+      })
+      
+      return initialStates
+    } catch {
+      return {}
+    }
+  }
+
+  const [buttonStates, setButtonStates] = useState<Record<number, 'idle' | 'editing' | 'saving' | 'saved'>>(getInitialButtonStates)
   const [editingNames, setEditingNames] = useState<Record<number, string>>({})
 
   // Create a unique identifier for a solution
@@ -66,26 +84,28 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
     }
   }
 
-  // Initialize button states based on saved solutions
+  // Update button states when solutions change or checklist is deleted
   React.useEffect(() => {
     const updateButtonStates = () => {
       const savedSolutions = loadSavedSolutions()
-      const initialStates: Record<number, 'idle' | 'editing' | 'saving' | 'saved'> = {}
+      const updatedStates: Record<number, 'idle' | 'editing' | 'saving' | 'saved'> = {}
       
       solutions.forEach((solution, index) => {
         const solutionId = getSolutionId(solution)
         if (savedSolutions.has(solutionId)) {
-          initialStates[index] = 'saved'
+          updatedStates[index] = 'saved'
         } else {
-          initialStates[index] = 'idle'
+          updatedStates[index] = 'idle'
         }
       })
       
-      setButtonStates(initialStates)
+      setButtonStates(updatedStates)
     }
 
-    // Initial load
-    updateButtonStates()
+    // Only update when solutions change (not on initial mount)
+    if (solutions.length > 0) {
+      updateButtonStates()
+    }
 
     // Listen for checklist deletions
     const handleChecklistDeleted = () => {
