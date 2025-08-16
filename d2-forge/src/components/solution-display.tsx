@@ -1,11 +1,14 @@
 "use client"
 
-import React from 'react'
+import React, { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle, AlertTriangle } from 'lucide-react'
+import { CheckCircle, AlertTriangle, ClipboardList, Check, X } from 'lucide-react'
 import { StatIcon } from '@/components/stat-icon'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { expandSolutionToChecklist, saveChecklist } from '@/lib/checklist-utils'
 
 interface PieceType {
   arch: string
@@ -34,6 +37,138 @@ interface SolutionDisplayProps {
 const STAT_NAMES = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"]
 
 export function SolutionDisplay({ solutions, desiredStats, isLoading = false, error = null }: SolutionDisplayProps) {
+  // Load saved solution states from sessionStorage synchronously for initial render
+  const getInitialButtonStates = (): Record<number, 'idle' | 'editing' | 'saving' | 'saved'> => {
+    try {
+      const saved = sessionStorage.getItem('d2forge-saved-solutions')
+      const savedSolutions = new Set(saved ? JSON.parse(saved) : [])
+      const initialStates: Record<number, 'idle' | 'editing' | 'saving' | 'saved'> = {}
+      
+      solutions.forEach((solution, index) => {
+        const solutionId = JSON.stringify(solution.pieces)
+        initialStates[index] = savedSolutions.has(solutionId) ? 'saved' : 'idle'
+      })
+      
+      return initialStates
+    } catch {
+      return {}
+    }
+  }
+
+  const [buttonStates, setButtonStates] = useState<Record<number, 'idle' | 'editing' | 'saving' | 'saved'>>(getInitialButtonStates)
+  const [editingNames, setEditingNames] = useState<Record<number, string>>({})
+
+  // Create a unique identifier for a solution
+  const getSolutionId = (solution: Solution) => {
+    return JSON.stringify(solution.pieces)
+  }
+
+  // Load saved solution states from sessionStorage
+  const loadSavedSolutions = (): Set<string> => {
+    try {
+      const saved = sessionStorage.getItem('d2forge-saved-solutions')
+      return new Set(saved ? JSON.parse(saved) : [])
+    } catch {
+      return new Set()
+    }
+  }
+
+  // Save solution as saved to sessionStorage
+  const markSolutionAsSaved = (solutionId: string) => {
+    try {
+      const savedSolutions = loadSavedSolutions()
+      savedSolutions.add(solutionId)
+      sessionStorage.setItem('d2forge-saved-solutions', JSON.stringify(Array.from(savedSolutions)))
+    } catch (error) {
+      console.warn('Failed to save solution state:', error)
+    }
+  }
+
+  // Update button states when solutions change or checklist is deleted
+  React.useEffect(() => {
+    const updateButtonStates = () => {
+      const savedSolutions = loadSavedSolutions()
+      const updatedStates: Record<number, 'idle' | 'editing' | 'saving' | 'saved'> = {}
+      
+      solutions.forEach((solution, index) => {
+        const solutionId = getSolutionId(solution)
+        if (savedSolutions.has(solutionId)) {
+          updatedStates[index] = 'saved'
+        } else {
+          updatedStates[index] = 'idle'
+        }
+      })
+      
+      setButtonStates(updatedStates)
+    }
+
+    // Only update when solutions change (not on initial mount)
+    if (solutions.length > 0) {
+      updateButtonStates()
+    }
+
+    // Listen for checklist deletions
+    const handleChecklistDeleted = () => {
+      updateButtonStates()
+    }
+
+    window.addEventListener('checklistDeleted', handleChecklistDeleted)
+    
+    return () => {
+      window.removeEventListener('checklistDeleted', handleChecklistDeleted)
+    }
+  }, [solutions])
+
+  const handleStartEdit = (solutionIndex: number) => {
+    setButtonStates(prev => ({ ...prev, [solutionIndex]: 'editing' }))
+    setEditingNames(prev => ({ 
+      ...prev, 
+      [solutionIndex]: `Build Solution ${solutionIndex + 1}` 
+    }))
+  }
+
+  const handleCancelEdit = (solutionIndex: number) => {
+    setButtonStates(prev => ({ ...prev, [solutionIndex]: 'idle' }))
+    setEditingNames(prev => {
+      const updated = { ...prev }
+      delete updated[solutionIndex]
+      return updated
+    })
+  }
+
+  const handleSaveChecklist = async (solutionIndex: number) => {
+    const solution = solutions[solutionIndex]
+    const buildName = editingNames[solutionIndex] || `Build Solution ${solutionIndex + 1}`
+    
+    try {
+      // Set saving state
+      setButtonStates(prev => ({ ...prev, [solutionIndex]: 'saving' }))
+      
+      // Create checklist
+      const finalName = buildName.trim() || `Build Solution ${solutionIndex + 1}`
+      const checklist = expandSolutionToChecklist(solution, desiredStats, solutionIndex)
+      checklist.name = finalName
+      saveChecklist(checklist)
+      
+      // Mark solution as saved persistently
+      const solutionId = getSolutionId(solution)
+      markSolutionAsSaved(solutionId)
+      
+      // Clear editing state
+      setEditingNames(prev => {
+        const updated = { ...prev }
+        delete updated[solutionIndex]
+        return updated
+      })
+      
+      // Set saved state permanently (no more auto-reset)
+      setButtonStates(prev => ({ ...prev, [solutionIndex]: 'saved' }))
+      
+    } catch (error) {
+      console.error('Failed to create checklist:', error)
+      setButtonStates(prev => ({ ...prev, [solutionIndex]: 'idle' }))
+    }
+  }
   
   if (error) {
     return (
@@ -117,16 +252,85 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
       {solutions.map((solution, index) => (
         <Card key={index}>
           <CardHeader>
-            <CardTitle className="text-lg">
-              Solution {index + 1}
-              {solution.deviation === 0 ? (
-                <Badge className="ml-2" variant="default">Exact Match</Badge>
-              ) : (
-                <Badge className="ml-2" variant="secondary">
-                  ~{solution.deviation.toFixed(1)} deviation score
-                </Badge>
-              )}
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">
+                Solution {index + 1}
+                {solution.deviation === 0 ? (
+                  <Badge className="ml-2" variant="default">Exact Match</Badge>
+                ) : (
+                  <Badge className="ml-2" variant="secondary">
+                    ~{solution.deviation.toFixed(1)} deviation score
+                  </Badge>
+                )}
+              </CardTitle>
+<div className="flex items-center gap-2">
+                {(() => {
+                  const state = buttonStates[index] || 'idle'
+                  
+                  if (state === 'saved') {
+                    return (
+                      <button
+                        disabled
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-green-600 border border-green-600 rounded-md transition-all duration-300 cursor-not-allowed"
+                      >
+                        <Check className="h-4 w-4" />
+                        Saved to Checklist
+                      </button>
+                    )
+                  }
+                  
+                  if (state === 'editing') {
+                    return (
+                      <>
+                        <Input
+                          value={editingNames[index] || ''}
+                          onChange={(e) => setEditingNames(prev => ({ ...prev, [index]: e.target.value }))}
+                          className="h-8 text-sm"
+                          placeholder="Enter build name..."
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleSaveChecklist(index)
+                            } else if (e.key === 'Escape') {
+                              handleCancelEdit(index)
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSaveChecklist(index)}
+                          className="h-8 px-2"
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCancelEdit(index)}
+                          className="h-8 px-2"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )
+                  }
+                  
+                  return (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleStartEdit(index)}
+                      disabled={state === 'saving'}
+                      className="flex items-center gap-2 transition-all duration-200"
+                    >
+                      <ClipboardList className={`h-4 w-4 ${state === 'saving' ? 'animate-spin' : ''}`} />
+                      {state === 'saving' ? 'Saving...' : 'Add to Checklist'}
+                    </Button>
+                  )
+                })()}
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">

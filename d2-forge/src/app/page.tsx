@@ -1,9 +1,12 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { StatInputForm } from '@/components/stat-input-form'
 import { SolutionDisplay } from '@/components/solution-display'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { Button } from '@/components/ui/button'
+import { ClipboardList } from 'lucide-react'
+import Link from 'next/link'
 
 interface Solution {
   pieces: Record<string, number>
@@ -45,9 +48,36 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Restore solutions and desiredStats from sessionStorage on component mount
+  useEffect(() => {
+    try {
+      const savedState = sessionStorage.getItem('d2forge-main-state')
+      if (savedState) {
+        const { solutions: savedSolutions, desiredStats: savedStats } = JSON.parse(savedState)
+        if (savedSolutions) setSolutions(savedSolutions)
+        if (savedStats) setDesiredStats(savedStats)
+      }
+    } catch (error) {
+      console.warn('Failed to restore main page state:', error)
+    }
+  }, [])
+
+  // Save solutions and desiredStats to sessionStorage whenever they change
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('d2forge-main-state', JSON.stringify({
+        solutions,
+        desiredStats
+      }))
+    } catch (error) {
+      console.warn('Failed to save main page state:', error)
+    }
+  }, [solutions, desiredStats])
+
   const handleSubmit = async (data: FormData) => {
     setIsLoading(true)
     setError(null) // Clear previous errors
+    
     // Extract only the stat values for display, excluding optimization options
     const { 
       allow_tuned, use_exotic, use_class_item_exotic, exotic_perk1, exotic_perk2,
@@ -109,22 +139,32 @@ export default function Home() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto space-y-8">
           {/* Header */}
-          <div className="relative">
-            <div className="absolute top-0 right-0">
+          <div className="space-y-4">
+            {/* Mobile and Desktop Navigation */}
+            <div className="flex justify-end items-center gap-2">
+              <Link href="/checklists">
+                <Button variant="outline" size="sm" className="w-auto px-3">
+                  <ClipboardList className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">My Checklists</span>
+                  <span className="sm:hidden">Checklists</span>
+                </Button>
+              </Link>
               <ThemeToggle />
             </div>
-            <div className="text-center space-y-4">
+
+            {/* Title and Description */}
+            <div className="text-center space-y-4 pt-4">
               <div className="flex items-center justify-center gap-3">
                 <img 
                   src="/d2-forge.svg" 
                   alt="D2 Forge Logo" 
-                  className="w-12 h-12 filter dark:invert-0 invert"
+                  className="w-10 h-10 sm:w-12 sm:h-12"
                 />
-                <h1 className="text-4xl font-bold tracking-tight">
+                <h1 className="text-2xl sm:text-4xl font-bold tracking-tight">
                   D2 Forge
                 </h1>
               </div>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
                 Forge optimal Destiny 2 armor builds to achieve your desired stat distribution 
                 using Mixed Integer Linear Programming.
               </p>
@@ -135,7 +175,10 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
             {/* Stat Input Form */}
             <div className="lg:col-span-2">
-              <StatInputForm onSubmit={handleSubmit} isLoading={isLoading} />
+              <StatInputForm 
+                onSubmit={handleSubmit} 
+                isLoading={isLoading} 
+              />
             </div>
 
             {/* Solutions Display */}

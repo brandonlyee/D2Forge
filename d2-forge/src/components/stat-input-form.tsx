@@ -22,10 +22,10 @@ const STAT_NAMES = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"] a
 const EXOTIC_PERK_MAPPING = {
   "Spirit of the Assassin": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity"],
   "Spirit of Inmost Light": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of Cyrtarachne", "Spirit of the Gyrfalcon", "Spirit of the Wormhusk", "Spirit of the Coyote"],
-  "Spirit of the Dragon": ["Spirit of the Star-Eater", "Spirit of the Coyote"],
+  "Spirit of the Dragon": ["Spirit of the Star-Eater", "Spirit of the Coyote", "Spirit of Verity"],
   "Spirit of the Foe Tracer": ["Spirit of the Star-Eater"],
   "Spirit of Caliban": ["Spirit of Synthoceps", "Spirit of Cyrtarachne", "Spirit of the Liar"],
-  "Spirit of Renewal": ["Spirit of Cyrtarachne", "Spirit of the Coyote"],
+  "Spirit of Renewal": ["Spirit of Cyrtarachne", "Spirit of the Coyote", "Spirit of the Liar"],
   "Spirit of Severance": ["Spirit of Synthoceps"],
   "Spirit of the Eternal Warrior": ["Spirit of the Star-Eater", "Spirit of Synthoceps"],
   "Spirit of the Abeyant": ["Spirit of Synthoceps"],
@@ -115,32 +115,79 @@ type FormData = z.infer<typeof formSchema>
 interface StatInputFormProps {
   onSubmit: (data: FormData) => void
   isLoading?: boolean
+  initialValues?: Partial<FormData>
 }
 
-export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProps) {
+export function StatInputForm({ onSubmit, isLoading = false, initialValues }: StatInputFormProps) {
+  const defaultValues = React.useMemo(() => ({
+    Health: 150,
+    Melee: 75,
+    Grenade: 75,
+    Super: 100,
+    Class: 75,
+    Weapons: 25,
+    // Default minimum constraints to false
+    Health_min: false,
+    Melee_min: false,
+    Grenade_min: false,
+    Super_min: false,
+    Class_min: false,
+    Weapons_min: false,
+    allow_tuned: true,
+    use_exotic: false,
+    use_class_item_exotic: false,
+    exotic_perk1: '',
+    exotic_perk2: '',
+  }), [])
+
+  // Load persisted state from sessionStorage first
+  const loadPersistedState = (): Partial<FormData> => {
+    try {
+      const saved = sessionStorage.getItem('d2forge-form-state')
+      return saved ? JSON.parse(saved) : {}
+    } catch {
+      return {}
+    }
+  }
+
+  // Save state to sessionStorage
+  const saveFormState = (data: Partial<FormData>) => {
+    try {
+      sessionStorage.setItem('d2forge-form-state', JSON.stringify(data))
+    } catch (error) {
+      console.warn('Failed to save form state:', error)
+    }
+  }
+  
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      Health: 150,
-      Melee: 75,
-      Grenade: 75,
-      Super: 100,
-      Class: 75,
-      Weapons: 25,
-      // Default minimum constraints to false
-      Health_min: false,
-      Melee_min: false,
-      Grenade_min: false,
-      Super_min: false,
-      Class_min: false,
-      Weapons_min: false,
-      allow_tuned: true,
-      use_exotic: false,
-      use_class_item_exotic: false,
-      exotic_perk1: '',
-      exotic_perk2: '',
+      ...defaultValues,
+      ...loadPersistedState(),
+      ...initialValues
     },
   })
+
+  // Reset form when initialValues change (but preserve persisted state if no initialValues)
+  React.useEffect(() => {
+    if (initialValues && Object.keys(initialValues).length > 0) {
+      const newValues = {
+        ...defaultValues,
+        ...loadPersistedState(),
+        ...initialValues
+      }
+      form.reset(newValues)
+      saveFormState(newValues)
+    }
+  }, [initialValues, form, defaultValues])
+
+  // Save form state on every change
+  React.useEffect(() => {
+    const subscription = form.watch((value) => {
+      saveFormState(value as FormData)
+    })
+    return () => subscription.unsubscribe()
+  }, [form])
 
   const watchedValues = form.watch()
   const totalStats = STAT_NAMES.reduce((sum, statName) => sum + (watchedValues[statName] || 0), 0)
@@ -291,6 +338,7 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
               ))}
             </div>
 
+            {/* Total Stats Display - positioned after sliders for visibility */}
             <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">Total Stats:</span>
@@ -353,8 +401,20 @@ export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProp
                 render={({ field }) => (
                   <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
-                      <FormLabel className="text-base font-medium">
+                      <FormLabel className="text-base font-medium flex items-center gap-2">
                         Use Exotic Armor
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button type="button" className="inline-flex">
+                                <Info className="h-4 w-4" suppressHydrationWarning />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-56">
+                              <p>Forces the use of one exotic armor piece of any archetype. Assumes a maximum stat roll of 63 (30/20/13).</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </FormLabel>
                       <div className="text-sm text-muted-foreground">
                         Include one exotic armor piece in the build (30/20/13 stat distribution).
