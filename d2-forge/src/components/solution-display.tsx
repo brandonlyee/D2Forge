@@ -4,12 +4,11 @@ import React, { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle, AlertTriangle, ClipboardList, Check, Edit3, X } from 'lucide-react'
+import { CheckCircle, AlertTriangle, ClipboardList, Check, X } from 'lucide-react'
 import { StatIcon } from '@/components/stat-icon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { expandSolutionToChecklist, saveChecklist } from '@/lib/checklist-utils'
-import { useRouter } from 'next/navigation'
 
 interface PieceType {
   arch: string
@@ -38,7 +37,6 @@ interface SolutionDisplayProps {
 const STAT_NAMES = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"]
 
 export function SolutionDisplay({ solutions, desiredStats, isLoading = false, error = null }: SolutionDisplayProps) {
-  const router = useRouter()
   const [buttonStates, setButtonStates] = useState<Record<number, 'idle' | 'editing' | 'saving' | 'saved'>>({})
   const [editingNames, setEditingNames] = useState<Record<number, string>>({})
 
@@ -226,7 +224,6 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                           variant="outline"
                           size="sm"
                           onClick={() => handleSaveChecklist(index)}
-                          disabled={state === 'saving'}
                           className="h-8 px-2"
                         >
                           <Check className="h-4 w-4" />

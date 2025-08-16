@@ -131,8 +131,6 @@ export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewPr
   // Calculate progress (excluding mods from completion calculation)
   const completedArmor = checklist.armorItems.filter(item => item.isCompleted).length
   const totalArmor = checklist.armorItems.length
-  const completedMods = checklist.modItems.filter(mod => mod.isCompleted).length
-  const totalMods = checklist.modItems.length
   const completedTuning = checklist.tuningItems.filter(tuning => tuning.isCompleted).length
   const totalTuning = checklist.tuningItems.length
   
@@ -223,7 +221,7 @@ export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewPr
         <div>
           <h4 className="font-medium mb-3">Mods Needed:</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {checklist.modItems.map((mod, index) => (
+            {checklist.modItems.map((mod) => (
               <div
                 key={mod.id}
                 className={`flex items-center gap-2 p-2 border rounded cursor-pointer transition-colors ${
@@ -250,7 +248,7 @@ export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewPr
           <div>
             <h4 className="font-medium mb-3">Tuning Requirements:</h4>
             <div className="space-y-2">
-              {checklist.tuningItems.map((tuning, index) => (
+              {checklist.tuningItems.map((tuning) => (
                 <div
                   key={tuning.id}
                   className={`flex items-center gap-2 p-2 border rounded ${
@@ -293,7 +291,7 @@ function generateChecklistText(checklist: ChecklistState): string {
   lines.push('')
   
   lines.push('ARMOR PIECES TO FARM:')
-  checklist.armorItems.forEach((item, index) => {
+  checklist.armorItems.forEach((item) => {
     const status = item.isCompleted ? '✓' : '□'
     const slot = item.assignedSlot ? ` (${item.assignedSlot})` : ''
     const tuning = item.tuningMode === 'flexible' 
