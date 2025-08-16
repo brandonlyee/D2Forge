@@ -68,19 +68,35 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
 
   // Initialize button states based on saved solutions
   React.useEffect(() => {
-    const savedSolutions = loadSavedSolutions()
-    const initialStates: Record<number, 'idle' | 'editing' | 'saving' | 'saved'> = {}
+    const updateButtonStates = () => {
+      const savedSolutions = loadSavedSolutions()
+      const initialStates: Record<number, 'idle' | 'editing' | 'saving' | 'saved'> = {}
+      
+      solutions.forEach((solution, index) => {
+        const solutionId = getSolutionId(solution)
+        if (savedSolutions.has(solutionId)) {
+          initialStates[index] = 'saved'
+        } else {
+          initialStates[index] = 'idle'
+        }
+      })
+      
+      setButtonStates(initialStates)
+    }
+
+    // Initial load
+    updateButtonStates()
+
+    // Listen for checklist deletions
+    const handleChecklistDeleted = () => {
+      updateButtonStates()
+    }
+
+    window.addEventListener('checklistDeleted', handleChecklistDeleted)
     
-    solutions.forEach((solution, index) => {
-      const solutionId = getSolutionId(solution)
-      if (savedSolutions.has(solutionId)) {
-        initialStates[index] = 'saved'
-      } else {
-        initialStates[index] = 'idle'
-      }
-    })
-    
-    setButtonStates(initialStates)
+    return () => {
+      window.removeEventListener('checklistDeleted', handleChecklistDeleted)
+    }
   }, [solutions])
 
   const handleStartEdit = (solutionIndex: number) => {

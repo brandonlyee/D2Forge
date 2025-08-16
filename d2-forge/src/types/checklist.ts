@@ -40,6 +40,7 @@ export interface ChecklistState {
   solutionData: {
     targetStats: Record<string, number>
     deviation: number
+    originalSolutionId?: string
   }
   armorItems: ChecklistArmorItem[]
   modItems: ChecklistModItem[]

@@ -116,7 +116,8 @@ export function expandSolutionToChecklist(
     name: `Build Solution ${solutionIndex + 1}`,
     solutionData: {
       targetStats,
-      deviation: solution.deviation
+      deviation: solution.deviation,
+      originalSolutionId: JSON.stringify(solution.pieces) // Store for deletion tracking
     },
     armorItems,
     modItems,
@@ -188,9 +189,37 @@ export function loadChecklists(): Record<string, ChecklistState> {
 export function deleteChecklist(checklistId: string): void {
   try {
     const existing = JSON.parse(localStorage.getItem('d2forge-checklists') || '{}')
+    const deletedChecklist = existing[checklistId]
     delete existing[checklistId]
     localStorage.setItem('d2forge-checklists', JSON.stringify(existing))
+    
+    // Remove from saved solutions tracking
+    if (deletedChecklist) {
+      removeSavedSolution(deletedChecklist)
+    }
+    
+    // Notify other components that a checklist was deleted
+    window.dispatchEvent(new CustomEvent('checklistDeleted', { 
+      detail: { checklistId, checklist: deletedChecklist } 
+    }))
   } catch (error) {
     console.error('Failed to delete checklist:', error)
+  }
+}
+
+// Remove solution from saved solutions tracking
+function removeSavedSolution(checklist: ChecklistState): void {
+  try {
+    const solutionId = checklist.solutionData?.originalSolutionId
+    if (solutionId) {
+      const saved = sessionStorage.getItem('d2forge-saved-solutions')
+      if (saved) {
+        const savedSolutions = new Set(JSON.parse(saved))
+        savedSolutions.delete(solutionId)
+        sessionStorage.setItem('d2forge-saved-solutions', JSON.stringify(Array.from(savedSolutions)))
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to remove saved solution:', error)
   }
 }
