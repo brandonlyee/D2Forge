@@ -145,28 +145,32 @@ export default function Home() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto space-y-8">
           {/* Header */}
-          <div className="relative">
-            <div className="absolute top-0 right-0 flex items-center gap-2">
+          <div className="space-y-4">
+            {/* Mobile and Desktop Navigation */}
+            <div className="flex justify-end items-center gap-2">
               <Link href="/checklists">
-                <Button variant="outline" size="icon" className="w-auto px-3">
+                <Button variant="outline" size="sm" className="w-auto px-3">
                   <ClipboardList className="h-4 w-4 mr-2" />
-                  My Checklists
+                  <span className="hidden sm:inline">My Checklists</span>
+                  <span className="sm:hidden">Checklists</span>
                 </Button>
               </Link>
               <ThemeToggle />
             </div>
-            <div className="text-center space-y-4">
+
+            {/* Title and Description */}
+            <div className="text-center space-y-4 pt-4">
               <div className="flex items-center justify-center gap-3">
                 <img 
                   src="/d2-forge.svg" 
                   alt="D2 Forge Logo" 
-                  className="w-12 h-12 filter dark:invert-0 invert"
+                  className="w-10 h-10 sm:w-12 sm:h-12"
                 />
-                <h1 className="text-4xl font-bold tracking-tight">
+                <h1 className="text-2xl sm:text-4xl font-bold tracking-tight">
                   D2 Forge
                 </h1>
               </div>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
                 Forge optimal Destiny 2 armor builds to achieve your desired stat distribution 
                 using Mixed Integer Linear Programming.
               </p>

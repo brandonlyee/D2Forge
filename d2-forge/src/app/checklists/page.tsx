@@ -78,27 +78,32 @@ export default function ChecklistsPage() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto space-y-8">
           {/* Header */}
-          <div className="relative">
-            <div className="relative flex items-center justify-between mb-8">
+          <div className="space-y-6">
+            {/* Navigation */}
+            <div className="flex items-center justify-between">
               <Link href="/">
-                <Button variant="outline" size="icon" className="w-auto px-3">
+                <Button variant="outline" size="sm" className="w-auto px-3">
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Optimizer
+                  <span className="hidden sm:inline">Back to Optimizer</span>
+                  <span className="sm:hidden">Back</span>
                 </Button>
               </Link>
-              <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
-                <h1 className="text-3xl font-bold tracking-tight">
-                  My Build Checklists
-                </h1>
-                <p className="text-muted-foreground mt-2">
-                  Track your farming progress for optimal Destiny 2 armor builds
-                </p>
-              </div>
               <ThemeToggle />
             </div>
+            
+            {/* Title and Description */}
+            <div className="text-center space-y-2">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                My Build Checklists
+              </h1>
+              <p className="text-sm sm:text-base text-muted-foreground px-4">
+                Track your farming progress for optimal Destiny 2 armor builds
+              </p>
+            </div>
+          </div>
 
-            {/* Summary Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2">

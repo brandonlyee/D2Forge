@@ -72,22 +72,42 @@ export function expandSolutionToChecklist(
     }
   })
 
-  // Expand tuning requirements into individual items
-  if (solution.tuningRequirements) {
-    Object.entries(solution.tuningRequirements).forEach(([stat, tuningDetails]) => {
-      tuningDetails.forEach((detail) => {
-        for (let i = 0; i < detail.count; i++) {
-          tuningItems.push({
-            id: generateId(),
-            targetStat: stat,
-            siphonStat: detail.siphon_from,
-            isCompleted: false,
-            assignedToItemId: null
-          })
+  // Extract tuning requirements from pieces
+  const tuningRequirementsMap: Record<string, { count: number, siphon_from: string }> = {}
+  
+  Object.entries(solution.pieces).forEach(([pieceKey, count]) => {
+    try {
+      const piece: PieceType = JSON.parse(pieceKey)
+      
+      // If this piece has tuning requirements
+      if (piece.tuned_stat && piece.siphon_from) {
+        const key = `${piece.tuned_stat}-${piece.siphon_from}`
+        if (!tuningRequirementsMap[key]) {
+          tuningRequirementsMap[key] = {
+            count: 0,
+            siphon_from: piece.siphon_from
+          }
         }
+        tuningRequirementsMap[key].count += count
+      }
+    } catch (error) {
+      console.warn('Failed to parse piece for tuning requirements:', pieceKey, error)
+    }
+  })
+
+  // Convert to individual tuning items
+  Object.entries(tuningRequirementsMap).forEach(([key, data]) => {
+    const [targetStat] = key.split('-')
+    for (let i = 0; i < data.count; i++) {
+      tuningItems.push({
+        id: generateId(),
+        targetStat,
+        siphonStat: data.siphon_from,
+        isCompleted: false,
+        assignedToItemId: null
       })
-    })
-  }
+    }
+  })
 
   const checklistId = `checklist-${Date.now()}-${generateId()}`
   

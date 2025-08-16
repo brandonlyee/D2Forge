@@ -148,6 +148,16 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
     },
   })
 
+  // Reset form when initialValues change
+  React.useEffect(() => {
+    if (initialValues) {
+      form.reset({
+        ...defaultValues,
+        ...initialValues
+      })
+    }
+  }, [initialValues, form])
+
   const watchedValues = form.watch()
   const totalStats = STAT_NAMES.reduce((sum, statName) => sum + (watchedValues[statName] || 0), 0)
   const maxPossibleStats = 515 // 5 pieces * 103 max per piece (with balanced tuning)

@@ -34,7 +34,7 @@ export function ArmorSlotIcon({ slot, size = 24, className = "" }: ArmorSlotIcon
       alt={`${label} slot`}
       width={size}
       height={size}
-      className={`inline-block filter dark:invert-0 invert ${className}`}
+      className={`inline-block filter dark:invert invert-0 ${className}`}
       suppressHydrationWarning
     />
   )
