@@ -269,15 +269,13 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                   
                   if (state === 'saved') {
                     return (
-                      <Button
-                        variant="default"
-                        size="sm"
+                      <button
                         disabled
-                        className="flex items-center gap-2 bg-green-600 hover:bg-green-600 transition-all duration-300"
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-green-600 border border-green-600 rounded-md transition-all duration-300 cursor-not-allowed"
                       >
                         <Check className="h-4 w-4" />
                         Saved to Checklist
-                      </Button>
+                      </button>
                     )
                   }
                   

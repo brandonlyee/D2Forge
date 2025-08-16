@@ -338,6 +338,7 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
               ))}
             </div>
 
+            {/* Total Stats Display - positioned after sliders for visibility */}
             <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">Total Stats:</span>
