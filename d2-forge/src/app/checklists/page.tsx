@@ -41,19 +41,17 @@ export default function ChecklistsPage() {
   )
 
   const completedChecklists = checklistArray.filter(checklist => {
-    const totalItems = checklist.armorItems.length + checklist.modItems.length + checklist.tuningItems.length
+    const totalItems = checklist.armorItems.length + checklist.tuningItems.length
     const completedItems = 
       checklist.armorItems.filter(item => item.isCompleted).length +
-      checklist.modItems.filter(mod => mod.isCompleted).length +
       checklist.tuningItems.filter(tuning => tuning.isCompleted).length
     return totalItems > 0 && completedItems === totalItems
   })
 
   const activeChecklists = checklistArray.filter(checklist => {
-    const totalItems = checklist.armorItems.length + checklist.modItems.length + checklist.tuningItems.length
+    const totalItems = checklist.armorItems.length + checklist.tuningItems.length
     const completedItems = 
       checklist.armorItems.filter(item => item.isCompleted).length +
-      checklist.modItems.filter(mod => mod.isCompleted).length +
       checklist.tuningItems.filter(tuning => tuning.isCompleted).length
     return totalItems === 0 || completedItems < totalItems
   })

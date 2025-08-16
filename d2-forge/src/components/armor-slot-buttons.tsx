@@ -41,7 +41,7 @@ export function ArmorSlotButtons({ item, slotsUsed, onSlotSelect }: ArmorSlotBut
                 : `${slot} slot not available for this item`
             }
           >
-            <ArmorSlotIcon slot={slot} size={16} />
+            <ArmorSlotIcon slot={slot} size={20} />
           </Button>
         )
       })}

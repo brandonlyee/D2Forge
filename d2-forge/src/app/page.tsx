@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { StatInputForm } from '@/components/stat-input-form'
 import { SolutionDisplay } from '@/components/solution-display'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -45,12 +45,45 @@ export default function Home() {
     Class: 75,
     Weapons: 25,
   })
+  const [formState, setFormState] = useState<Partial<FormData> | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Restore state from sessionStorage on component mount
+  useEffect(() => {
+    try {
+      const savedState = sessionStorage.getItem('d2forge-main-state')
+      if (savedState) {
+        const { solutions: savedSolutions, desiredStats: savedStats, formState: savedFormState } = JSON.parse(savedState)
+        if (savedSolutions) setSolutions(savedSolutions)
+        if (savedStats) setDesiredStats(savedStats)
+        if (savedFormState) setFormState(savedFormState)
+      }
+    } catch (error) {
+      console.warn('Failed to restore main page state:', error)
+    }
+  }, [])
+
+  // Save state to sessionStorage whenever state changes
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('d2forge-main-state', JSON.stringify({
+        solutions,
+        desiredStats,
+        formState
+      }))
+    } catch (error) {
+      console.warn('Failed to save main page state:', error)
+    }
+  }, [solutions, desiredStats, formState])
 
   const handleSubmit = async (data: FormData) => {
     setIsLoading(true)
     setError(null) // Clear previous errors
+    
+    // Save the form state for restoration
+    setFormState(data)
+    
     // Extract only the stat values for display, excluding optimization options
     const { 
       allow_tuned, use_exotic, use_class_item_exotic, exotic_perk1, exotic_perk2,
@@ -144,7 +177,11 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
             {/* Stat Input Form */}
             <div className="lg:col-span-2">
-              <StatInputForm onSubmit={handleSubmit} isLoading={isLoading} />
+              <StatInputForm 
+                onSubmit={handleSubmit} 
+                isLoading={isLoading} 
+                initialValues={formState || undefined}
+              />
             </div>
 
             {/* Solutions Display */}

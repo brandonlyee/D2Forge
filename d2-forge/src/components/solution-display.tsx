@@ -1,12 +1,13 @@
 "use client"
 
-import React from 'react'
+import React, { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle, AlertTriangle, ClipboardList } from 'lucide-react'
+import { CheckCircle, AlertTriangle, ClipboardList, Check, Edit3, X } from 'lucide-react'
 import { StatIcon } from '@/components/stat-icon'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { expandSolutionToChecklist, saveChecklist } from '@/lib/checklist-utils'
 import { useRouter } from 'next/navigation'
 
@@ -38,18 +39,58 @@ const STAT_NAMES = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"]
 
 export function SolutionDisplay({ solutions, desiredStats, isLoading = false, error = null }: SolutionDisplayProps) {
   const router = useRouter()
+  const [buttonStates, setButtonStates] = useState<Record<number, 'idle' | 'editing' | 'saving' | 'saved'>>({})
+  const [editingNames, setEditingNames] = useState<Record<number, string>>({})
 
-  const handleAddToChecklist = (solution: Solution, solutionIndex: number) => {
+  const handleStartEdit = (solutionIndex: number) => {
+    setButtonStates(prev => ({ ...prev, [solutionIndex]: 'editing' }))
+    setEditingNames(prev => ({ 
+      ...prev, 
+      [solutionIndex]: `Build Solution ${solutionIndex + 1}` 
+    }))
+  }
+
+  const handleCancelEdit = (solutionIndex: number) => {
+    setButtonStates(prev => ({ ...prev, [solutionIndex]: 'idle' }))
+    setEditingNames(prev => {
+      const updated = { ...prev }
+      delete updated[solutionIndex]
+      return updated
+    })
+  }
+
+  const handleSaveChecklist = async (solutionIndex: number) => {
+    const solution = solutions[solutionIndex]
+    const buildName = editingNames[solutionIndex] || `Build Solution ${solutionIndex + 1}`
+    
     try {
+      // Set saving state
+      setButtonStates(prev => ({ ...prev, [solutionIndex]: 'saving' }))
+      
+      // Create checklist
+      const finalName = buildName.trim() || `Build Solution ${solutionIndex + 1}`
       const checklist = expandSolutionToChecklist(solution, desiredStats, solutionIndex)
+      checklist.name = finalName
       saveChecklist(checklist)
       
-      // Show success message and navigate to checklists
-      alert('Build added to your checklists!')
-      router.push('/checklists')
+      // Clear editing state
+      setEditingNames(prev => {
+        const updated = { ...prev }
+        delete updated[solutionIndex]
+        return updated
+      })
+      
+      // Set saved state
+      setButtonStates(prev => ({ ...prev, [solutionIndex]: 'saved' }))
+      
+      // Reset to idle after 3 seconds
+      setTimeout(() => {
+        setButtonStates(prev => ({ ...prev, [solutionIndex]: 'idle' }))
+      }, 3000)
+      
     } catch (error) {
       console.error('Failed to create checklist:', error)
-      alert('Failed to create checklist. Please try again.')
+      setButtonStates(prev => ({ ...prev, [solutionIndex]: 'idle' }))
     }
   }
   
@@ -146,15 +187,76 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                   </Badge>
                 )}
               </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleAddToChecklist(solution, index)}
-                className="flex items-center gap-2"
-              >
-                <ClipboardList className="h-4 w-4" />
-                Add to Checklist
-              </Button>
+<div className="flex items-center gap-2">
+                {(() => {
+                  const state = buttonStates[index] || 'idle'
+                  
+                  if (state === 'saved') {
+                    return (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        disabled
+                        className="flex items-center gap-2 bg-green-600 hover:bg-green-600 transition-all duration-300 animate-pulse"
+                      >
+                        <Check className="h-4 w-4" />
+                        Build Saved!
+                      </Button>
+                    )
+                  }
+                  
+                  if (state === 'editing') {
+                    return (
+                      <>
+                        <Input
+                          value={editingNames[index] || ''}
+                          onChange={(e) => setEditingNames(prev => ({ ...prev, [index]: e.target.value }))}
+                          className="h-8 text-sm"
+                          placeholder="Enter build name..."
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleSaveChecklist(index)
+                            } else if (e.key === 'Escape') {
+                              handleCancelEdit(index)
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSaveChecklist(index)}
+                          disabled={state === 'saving'}
+                          className="h-8 px-2"
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCancelEdit(index)}
+                          className="h-8 px-2"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )
+                  }
+                  
+                  return (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleStartEdit(index)}
+                      disabled={state === 'saving'}
+                      className="flex items-center gap-2 transition-all duration-200"
+                    >
+                      <ClipboardList className={`h-4 w-4 ${state === 'saving' ? 'animate-spin' : ''}`} />
+                      {state === 'saving' ? 'Saving...' : 'Add to Checklist'}
+                    </Button>
+                  )
+                })()}
+              </div>
             </div>
           </CardHeader>
           <CardContent>

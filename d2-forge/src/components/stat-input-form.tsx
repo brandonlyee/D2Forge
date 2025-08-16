@@ -115,30 +115,36 @@ type FormData = z.infer<typeof formSchema>
 interface StatInputFormProps {
   onSubmit: (data: FormData) => void
   isLoading?: boolean
+  initialValues?: Partial<FormData>
 }
 
-export function StatInputForm({ onSubmit, isLoading = false }: StatInputFormProps) {
+export function StatInputForm({ onSubmit, isLoading = false, initialValues }: StatInputFormProps) {
+  const defaultValues = {
+    Health: 150,
+    Melee: 75,
+    Grenade: 75,
+    Super: 100,
+    Class: 75,
+    Weapons: 25,
+    // Default minimum constraints to false
+    Health_min: false,
+    Melee_min: false,
+    Grenade_min: false,
+    Super_min: false,
+    Class_min: false,
+    Weapons_min: false,
+    allow_tuned: true,
+    use_exotic: false,
+    use_class_item_exotic: false,
+    exotic_perk1: '',
+    exotic_perk2: '',
+  }
+  
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      Health: 150,
-      Melee: 75,
-      Grenade: 75,
-      Super: 100,
-      Class: 75,
-      Weapons: 25,
-      // Default minimum constraints to false
-      Health_min: false,
-      Melee_min: false,
-      Grenade_min: false,
-      Super_min: false,
-      Class_min: false,
-      Weapons_min: false,
-      allow_tuned: true,
-      use_exotic: false,
-      use_class_item_exotic: false,
-      exotic_perk1: '',
-      exotic_perk2: '',
+      ...defaultValues,
+      ...initialValues
     },
   })
 

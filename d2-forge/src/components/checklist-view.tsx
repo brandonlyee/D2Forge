@@ -86,9 +86,9 @@ export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewPr
       tuningItem.assignedToItemId = null
     })
 
-    // Check which tunings are satisfied by assigned armor pieces
+    // Check which tunings are satisfied by armor pieces with selected tunings
     updatedChecklist.armorItems.forEach(armorItem => {
-      if (armorItem.isCompleted && armorItem.selectedTuning) {
+      if (armorItem.selectedTuning) {
         // Find an incomplete tuning requirement that matches
         const matchingTuning = updatedChecklist.tuningItems.find(tuningItem => 
           tuningItem.targetStat === armorItem.selectedTuning && 
@@ -128,7 +128,7 @@ export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewPr
     }
   }
 
-  // Calculate progress
+  // Calculate progress (excluding mods from completion calculation)
   const completedArmor = checklist.armorItems.filter(item => item.isCompleted).length
   const totalArmor = checklist.armorItems.length
   const completedMods = checklist.modItems.filter(mod => mod.isCompleted).length
@@ -136,8 +136,8 @@ export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewPr
   const completedTuning = checklist.tuningItems.filter(tuning => tuning.isCompleted).length
   const totalTuning = checklist.tuningItems.length
   
-  const totalCompleted = completedArmor + completedMods + completedTuning
-  const totalItems = totalArmor + totalMods + totalTuning
+  const totalCompleted = completedArmor + completedTuning
+  const totalItems = totalArmor + totalTuning
   const progressPercentage = totalItems > 0 ? Math.round((totalCompleted / totalItems) * 100) : 0
 
   return (
@@ -178,8 +178,10 @@ export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewPr
               <div key={item.id} className="p-3 border rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">
-                      {index + 1}. {item.archetype}
+                    <span className="text-sm font-medium flex items-center gap-1">
+                      {index + 1}. 
+                      <StatIcon stat={item.archetype.replace('Exotic ', '')} size={16} />
+                      {item.archetype}
                     </span>
                     {item.isExotic && <Badge variant="destructive" className="text-xs">Exotic</Badge>}
                   </div>
