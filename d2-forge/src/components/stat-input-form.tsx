@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { MobileTooltip } from '@/components/mobile-tooltip'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Info, Lock } from 'lucide-react'
 import { StatIcon } from '@/components/stat-icon'
@@ -250,18 +250,12 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
           <span className="text-xl sm:text-2xl">⚔️</span>
           <span className="hidden sm:inline">Destiny 2 Stat Optimizer</span>
           <span className="sm:hidden">D2 Optimizer</span>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button type="button" className="inline-flex">
-                  <Info className="h-4 w-4" suppressHydrationWarning />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-56">
-                <p>Currently, we are not accounting for stat modifications from Subclass Fragments, or Fonts. Please input your desired stats accordingly.</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <MobileTooltip
+            content="Currently, we are not accounting for stat modifications from Subclass Fragments, or Fonts. Please input your desired stats accordingly."
+            side="bottom"
+          >
+            <Info className="h-4 w-4" suppressHydrationWarning />
+          </MobileTooltip>
         </CardTitle>
         <CardDescription className="text-sm">
           Enter your desired stat distribution. The optimizer will find the best armor combinations.
@@ -288,22 +282,18 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
                           name={`${statName}_min` as keyof FormData}
                           render={({ field: lockField }) => (
                             <div className="flex items-center gap-2">
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className="flex items-center gap-1">
-                                      <Lock className="h-3 w-3 text-muted-foreground" suppressHydrationWarning />
-                                      <Switch
-                                        checked={Boolean(lockField.value)}
-                                        onCheckedChange={lockField.onChange}
-                                      />
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>Lock as minimum: If possible, solutions must have at least this value</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                              <MobileTooltip
+                                content="Lock as minimum: If possible, solutions must have at least this value"
+                                side="bottom"
+                              >
+                                <div className="flex items-center gap-1">
+                                  <Lock className="h-3 w-3 text-muted-foreground" suppressHydrationWarning />
+                                  <Switch
+                                    checked={Boolean(lockField.value)}
+                                    onCheckedChange={lockField.onChange}
+                                  />
+                                </div>
+                              </MobileTooltip>
                             </div>
                           )}
                         />
@@ -350,18 +340,12 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
               </div>
               <div className="flex items-center gap-1 text-sm text-muted-foreground">
                 <span>Max Possible: {maxPossibleStats}</span>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button type="button" className="inline-flex">
-                        <Info className="h-3 w-3" suppressHydrationWarning />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-sm">
-                      <p>Assuming all Tier 5 armor, five +10 Stat mods,<br />and five Balanced Tuning mods, 515 is the<br />maximum amount of stats that can be<br />provided by a set of armor.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <MobileTooltip
+                  content="Assuming all Tier 5 armor, five +10 Stat mods, and five Balanced Tuning mods, 515 is the maximum amount of stats that can be provided by a set of armor."
+                  side="bottom"
+                >
+                  <Info className="h-3 w-3" suppressHydrationWarning />
+                </MobileTooltip>
               </div>
             </div>
 
@@ -405,18 +389,12 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
                     <div className="space-y-0.5 pr-2">
                       <FormLabel className="text-sm sm:text-base font-medium flex items-center gap-2">
                         Use Exotic Armor
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button type="button" className="inline-flex">
-                                <Info className="h-4 w-4" suppressHydrationWarning />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-56">
-                              <p>Forces the use of one exotic armor piece of any archetype. Assumes a maximum stat roll of 63 (30/20/13).</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                        <MobileTooltip
+                          content="Forces the use of one exotic armor piece of any archetype. Assumes a maximum stat roll of 63 (30/20/13)."
+                          side="bottom"
+                        >
+                          <Info className="h-4 w-4" suppressHydrationWarning />
+                        </MobileTooltip>
                       </FormLabel>
                       <div className="text-xs sm:text-sm text-muted-foreground">
                         Include one exotic armor piece in the build (30/20/13 stat distribution).
@@ -462,18 +440,12 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
                   <div>
                     <h4 className="text-base font-medium mb-2 flex items-center gap-2">
                       Exotic Class Item Perks
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button type="button" className="inline-flex">
-                              <Info className="h-4 w-4" suppressHydrationWarning />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <p>Some Exotic Class Item perk combinations<br />are not available at this time, due to<br />uncertainty of their stat distributions.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <MobileTooltip
+                        content="Some Exotic Class Item perk combinations are not available at this time, due to uncertainty of their stat distributions."
+                        side="bottom"
+                      >
+                        <Info className="h-4 w-4" suppressHydrationWarning />
+                      </MobileTooltip>
                     </h4>
                     <p className="text-sm text-muted-foreground mb-4">
                       Select two perks for your exotic class item. Only certain combinations are available.

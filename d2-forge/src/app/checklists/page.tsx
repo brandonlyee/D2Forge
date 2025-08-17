@@ -75,15 +75,15 @@ export default function ChecklistsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-7xl mx-auto space-y-8">
+      <div className="container mx-auto px-4 py-4 sm:py-8">
+        <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
           {/* Header */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Navigation */}
             <div className="flex items-center justify-between">
               <Link href="/">
-                <Button variant="outline" size="sm" className="w-auto px-3">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                <Button variant="outline" size="sm" className="h-8 sm:h-9 px-2 sm:px-3">
+                  <ArrowLeft className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">Back to Optimizer</span>
                   <span className="sm:hidden">Back</span>
                 </Button>
@@ -93,10 +93,10 @@ export default function ChecklistsPage() {
             
             {/* Title and Description */}
             <div className="text-center space-y-2">
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              <h1 className="text-xl sm:text-3xl font-bold tracking-tight">
                 My Build Checklists
               </h1>
-              <p className="text-sm sm:text-base text-muted-foreground px-4">
+              <p className="text-sm sm:text-base text-muted-foreground px-2 sm:px-4">
                 Track your farming progress for optimal Destiny 2 armor builds
               </p>
             </div>
