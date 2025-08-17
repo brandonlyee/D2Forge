@@ -147,40 +147,42 @@ export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewPr
 
   return (
     <Card className="w-full">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              {checklist.name}
-              <Badge variant={progressPercentage === 100 ? "default" : "secondary"}>
+      <CardHeader className="pb-4 sm:pb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="space-y-2">
+            <CardTitle className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <span className="text-base sm:text-lg">{checklist.name}</span>
+              <Badge variant={progressPercentage === 100 ? "default" : "secondary"} className="text-xs self-start">
                 {progressPercentage}% Complete
               </Badge>
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-sm">
               Target: {Object.entries(checklist.solutionData.targetStats)
                 .map(([stat, value]) => `${value} ${stat}`)
                 .join(', ')}
             </CardDescription>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={copyToClipboard}>
-              <Copy className="h-4 w-4 mr-1" />
-              Copy
+          <div className="flex gap-2 self-start sm:self-center">
+            <Button variant="outline" size="sm" onClick={copyToClipboard} className="h-8 sm:h-9 px-2 sm:px-3">
+              <Copy className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Copy</span>
             </Button>
 {deleteState === 'confirming' ? (
               <div className="flex gap-2">
-                <Button variant="destructive" size="sm" onClick={handleDelete}>
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Confirm Delete
+                <Button variant="destructive" size="sm" onClick={handleDelete} className="h-8 sm:h-9 px-2 sm:px-3">
+                  <Trash2 className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Confirm Delete</span>
+                  <span className="sm:hidden">Delete</span>
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleCancelDelete}>
+                <Button variant="outline" size="sm" onClick={handleCancelDelete} className="h-8 sm:h-9 px-2">
                   <X className="h-4 w-4" />
                 </Button>
               </div>
             ) : (
-              <Button variant="outline" size="sm" onClick={handleDelete}>
-                <Trash2 className="h-4 w-4 mr-1" />
-                Delete
+              <Button variant="outline" size="sm" onClick={handleDelete} className="h-8 sm:h-9 px-2 sm:px-3">
+                <Trash2 className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Delete</span>
+                <span className="sm:hidden sr-only">Delete</span>
               </Button>
             )}
           </div>
@@ -219,7 +221,7 @@ export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewPr
                   {item.tuningMode === 'balanced' && ' - Balanced tuning'}
                   {item.tuningMode === 'none' && item.isExotic && ' - No tuning slot'}
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                   <div className="flex items-center gap-2">
                     <span className="text-sm">Slot:</span>
                     <ArmorSlotButtons
@@ -277,25 +279,38 @@ export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewPr
               {checklist.tuningItems.map((tuning) => (
                 <div
                   key={tuning.id}
-                  className={`flex items-center gap-2 p-2 border rounded ${
-                    tuning.isCompleted ? 'bg-green-50 border-green-200' : ''
+                  className={`p-3 border rounded-lg ${
+                    tuning.isCompleted ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-muted/50'
                   }`}
                 >
-                  <input
-                    type="checkbox"
-                    checked={tuning.isCompleted}
-                    disabled
-                    className="h-4 w-4"
-                  />
-                  <span className={tuning.isCompleted ? 'line-through text-muted-foreground' : ''}>
-                    <StatIcon stat={tuning.targetStat} size={16} className="inline mx-1" />
-                    {tuning.targetStat} Tuning: +5 {tuning.targetStat} / -5 {tuning.siphonStat}
-                  </span>
-                  {tuning.isCompleted && tuning.assignedToItemId && (
-                    <Badge variant="outline" className="text-xs ml-auto">
-                      Auto-completed
-                    </Badge>
-                  )}
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={tuning.isCompleted}
+                      disabled
+                      className="h-4 w-4 mt-1"
+                    />
+                    <div className="flex-1 space-y-2">
+                      <div className="font-medium flex items-center gap-1 text-sm">
+                        <StatIcon stat={tuning.targetStat} size={16} />
+                        {tuning.targetStat} Tuning:
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <span className="flex items-center gap-1 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded">
+                          +5 <StatIcon stat={tuning.targetStat} size={14} /> {tuning.targetStat}
+                        </span>
+                        <span className="text-muted-foreground">/</span>
+                        <span className="flex items-center gap-1 bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded">
+                          -5 <StatIcon stat={tuning.siphonStat} size={14} /> {tuning.siphonStat}
+                        </span>
+                      </div>
+                      {tuning.isCompleted && tuning.assignedToItemId && (
+                        <Badge variant="outline" className="text-xs">
+                          Auto-completed
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>

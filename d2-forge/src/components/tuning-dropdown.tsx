@@ -24,10 +24,18 @@ export function TuningDropdown({ item, onTuningSelect }: TuningDropdownProps) {
       value={item.selectedTuning || "none"}
       onValueChange={(value) => onTuningSelect(value === "none" ? null : value)}
     >
-      <SelectTrigger className="w-32">
+      <SelectTrigger className="w-24 sm:w-32 text-xs sm:text-sm">
         <SelectValue placeholder="Select tuning" />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent 
+        position="popper" 
+        side="bottom" 
+        align="start"
+        className="w-[--radix-select-trigger-width] min-w-fit"
+        sideOffset={4}
+        avoidCollisions={true}
+        sticky="always"
+      >
         <SelectItem value="none">
           <span className="text-muted-foreground">None</span>
         </SelectItem>
