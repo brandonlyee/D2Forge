@@ -2,27 +2,69 @@ from http.server import BaseHTTPRequestHandler
 import json
 import sys
 import os
+import time
 
 # Add the current directory to Python path so we can import our modules
 sys.path.append(os.path.dirname(__file__))
 
 from main import solve_with_milp_multiple, generate_piece_types, STAT_NAMES, calculate_actual_stats, CLASS_ITEM_ROLLS
+from cache import optimization_cache
+from rate_limiter import rate_limiter
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
+        start_time = time.time()
         try:
-            # Set CORS headers
+            # Get client IP for rate limiting
+            client_ip = self.headers.get('X-Forwarded-For', self.client_address[0]).split(',')[0].strip()
+            
+            # Check rate limit
+            is_allowed, retry_after = rate_limiter.is_allowed(client_ip)
+            if not is_allowed:
+                self.send_response(429)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Retry-After', str(retry_after))
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                error_response = {
+                    "error": "Rate limit exceeded. Please wait before making another request.",
+                    "retry_after_seconds": retry_after
+                }
+                self.wfile.write(json.dumps(error_response).encode('utf-8'))
+                return
+            
+            # Read request body first
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode('utf-8'))
+            
+            # Try to get cached response first
+            cached_response = optimization_cache.get(request_data)
+            if cached_response:
+                # Return cached response immediately  
+                response = cached_response.get('response', cached_response)
+                response['cached'] = True
+                response['cache_age_seconds'] = int(time.time() - cached_response.get('cached_at', time.time()))
+                
+                # Send cache hit response
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+                self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+                self.send_header('X-Cache-Status', 'HIT')
+                self.end_headers()
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+                return
+            
+            # Set CORS headers for cache miss
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
             self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
             self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+            self.send_header('X-Cache-Status', 'MISS')
             self.end_headers()
-            
-            # Read request body
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            request_data = json.loads(post_data.decode('utf-8'))
             
             # Extract parameters with defaults
             allow_tuned = request_data.get('allow_tuned', True)
@@ -63,15 +105,16 @@ class handler(BaseHTTPRequestHandler):
                 exotic_perks=exotic_perks_tuple
             )
             
-            # Run the optimization with full 30-second timeout (Vercel Hobby allows 300s)
+            # Run optimization with reduced timeout for better resource efficiency
+            # Most users get good results within 15 seconds
             solutions_list, deviations_list = solve_with_milp_multiple(
                 desired_totals, 
                 piece_types, 
                 piece_stats, 
-                max_solutions=10,
+                max_solutions=8,  # Slightly fewer solutions for faster computation
                 allow_tuned=allow_tuned,
                 require_exotic=use_exotic,
-                total_timeout=30,
+                total_timeout=15,  # Reduced from 30 to 15 seconds
                 minimum_constraints=minimum_constraints
             )
             
@@ -129,8 +172,17 @@ class handler(BaseHTTPRequestHandler):
                 
                 response = {
                     "solutions": formatted_solutions,
-                    "message": f"Found {len(formatted_solutions)} optimal solution(s)"
+                    "message": f"Found {len(formatted_solutions)} optimal solution(s)",
+                    "compute_time_seconds": round(time.time() - start_time, 2),
+                    "cached": False
                 }
+            
+            # Cache the response for future requests
+            optimization_cache.set(request_data, response)
+            
+            # Periodic cleanup to prevent memory leaks (every ~100 requests)
+            if int(start_time) % 100 == 0:
+                rate_limiter.cleanup_old_entries()
             
             # Send response
             self.wfile.write(json.dumps(response).encode('utf-8'))
