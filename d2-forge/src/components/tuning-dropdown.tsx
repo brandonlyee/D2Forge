@@ -2,13 +2,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { StatIcon } from '@/components/stat-icon'
 import { ChecklistArmorItem } from '@/types/checklist'
 import { canHaveTuning } from '@/lib/checklist-utils'
+import { STAT_NAMES } from '@/lib/constants'
 
 interface TuningDropdownProps {
   item: ChecklistArmorItem
   onTuningSelect: (tuning: string | null) => void
 }
-
-const STAT_NAMES = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"]
 
 export function TuningDropdown({ item, onTuningSelect }: TuningDropdownProps) {
   if (!canHaveTuning(item)) {

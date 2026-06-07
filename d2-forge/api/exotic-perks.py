@@ -1,5 +1,4 @@
 from http.server import BaseHTTPRequestHandler
-import json
 import sys
 import os
 
@@ -7,34 +6,24 @@ import os
 sys.path.append(os.path.dirname(__file__))
 
 from main import CLASS_ITEM_ROLLS
+from http_utils import send_json, send_preflight
+
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
-            # Set CORS headers
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
-            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-            self.end_headers()
-            
-            response = {
-                "available_combinations": list(CLASS_ITEM_ROLLS.keys()),
-                "class_item_rolls": CLASS_ITEM_ROLLS,
-                "description": "Available perk combinations for exotic class items"
-            }
-            
-            # Send response
-            self.wfile.write(json.dumps(response).encode('utf-8'))
-            
+            # CLASS_ITEM_ROLLS is keyed by (perk1, perk2) tuples, which aren't valid
+            # JSON object keys, so expose it as a list of explicit entries.
+            send_json(self, {
+                "available_combinations": [list(perks) for perks in CLASS_ITEM_ROLLS.keys()],
+                "class_item_rolls": [
+                    {"perks": list(perks), "stats": list(stats)}
+                    for perks, stats in CLASS_ITEM_ROLLS.items()
+                ],
+                "description": "Available perk combinations for exotic class items",
+            })
         except Exception as e:
-            self.send_error(500, f"Failed to get exotic perks: {str(e)}")
-    
+            send_json(self, {"error": f"Failed to get exotic perks: {str(e)}"}, status=500)
+
     def do_OPTIONS(self):
-        # Handle CORS preflight
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
+        send_preflight(self)

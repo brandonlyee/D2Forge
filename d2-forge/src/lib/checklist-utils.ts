@@ -1,27 +1,13 @@
-import { 
-  ChecklistState, 
-  ChecklistArmorItem, 
-  ChecklistModItem, 
+import {
+  ChecklistState,
+  ChecklistArmorItem,
+  ChecklistModItem,
   ChecklistTuningItem,
-  SlotsUsed 
+  SlotsUsed
 } from '@/types/checklist'
-
-interface PieceType {
-  arch: string
-  tertiary: string
-  tuning_mode: string
-  mod_target: string
-  tuned_stat?: string | null
-  siphon_from?: string | null
-}
-
-interface Solution {
-  pieces: Record<string, number>
-  deviation: number
-  actualStats?: number[]
-  tuningRequirements?: Record<string, Array<{count: number, siphon_from: string}>>
-  flexiblePieces?: number
-}
+import type { Solution } from '@/types/solution'
+import { STORAGE_KEYS } from '@/lib/constants'
+import { readJSON, writeJSON, parsePiece } from '@/lib/storage'
 
 // Generate unique ID for checklist items
 function generateId(): string {
@@ -40,35 +26,32 @@ export function expandSolutionToChecklist(
 
   // Expand armor pieces from grouped format to individual items
   Object.entries(solution.pieces).forEach(([pieceKey, count]) => {
-    try {
-      const piece: PieceType = JSON.parse(pieceKey)
-      
-      // Create individual items for each count
-      for (let i = 0; i < count; i++) {
-        const isExotic = piece.arch.toLowerCase().includes('exotic')
-        const isExoticClassItem = piece.arch.toLowerCase().includes('exotic class item')
-        
-        armorItems.push({
-          id: generateId(),
-          archetype: piece.arch,
-          tertiary: piece.tertiary,
-          isExotic,
-          isExoticClassItem,
-          tuningMode: piece.tuning_mode as 'flexible' | 'balanced' | 'none',
-          assignedSlot: null,
-          selectedTuning: null,
-          isCompleted: false
-        })
+    const piece = parsePiece(pieceKey)
+    if (!piece) return
 
-        // Add mod requirement for this piece
-        modItems.push({
-          id: generateId(),
-          stat: piece.mod_target,
-          isCompleted: false
-        })
-      }
-    } catch (error) {
-      console.warn('Failed to parse piece:', pieceKey, error)
+    // Create individual items for each count
+    for (let i = 0; i < count; i++) {
+      const isExotic = piece.arch.toLowerCase().includes('exotic')
+      const isExoticClassItem = piece.arch.toLowerCase().includes('exotic class item')
+
+      armorItems.push({
+        id: generateId(),
+        archetype: piece.arch,
+        tertiary: piece.tertiary,
+        isExotic,
+        isExoticClassItem,
+        tuningMode: piece.tuning_mode as 'flexible' | 'balanced' | 'none',
+        assignedSlot: null,
+        selectedTuning: null,
+        isCompleted: false
+      })
+
+      // Add mod requirement for this piece
+      modItems.push({
+        id: generateId(),
+        stat: piece.mod_target,
+        isCompleted: false
+      })
     }
   })
 
@@ -76,22 +59,19 @@ export function expandSolutionToChecklist(
   const tuningRequirementsMap: Record<string, { count: number, siphon_from: string }> = {}
   
   Object.entries(solution.pieces).forEach(([pieceKey, count]) => {
-    try {
-      const piece: PieceType = JSON.parse(pieceKey)
-      
-      // If this piece has tuning requirements
-      if (piece.tuned_stat && piece.siphon_from) {
-        const key = `${piece.tuned_stat}-${piece.siphon_from}`
-        if (!tuningRequirementsMap[key]) {
-          tuningRequirementsMap[key] = {
-            count: 0,
-            siphon_from: piece.siphon_from
-          }
+    const piece = parsePiece(pieceKey)
+    if (!piece) return
+
+    // If this piece has tuning requirements
+    if (piece.tuned_stat && piece.siphon_from) {
+      const key = `${piece.tuned_stat}-${piece.siphon_from}`
+      if (!tuningRequirementsMap[key]) {
+        tuningRequirementsMap[key] = {
+          count: 0,
+          siphon_from: piece.siphon_from
         }
-        tuningRequirementsMap[key].count += count
       }
-    } catch (error) {
-      console.warn('Failed to parse piece for tuning requirements:', pieceKey, error)
+      tuningRequirementsMap[key].count += count
     }
   })
 
@@ -163,63 +143,43 @@ export function canHaveTuning(item: ChecklistArmorItem): boolean {
 
 // Save checklist to localStorage
 export function saveChecklist(checklist: ChecklistState): void {
-  try {
-    const existing = JSON.parse(localStorage.getItem('d2forge-checklists') || '{}')
-    existing[checklist.id] = {
-      ...checklist,
-      lastUpdated: new Date().toISOString()
-    }
-    localStorage.setItem('d2forge-checklists', JSON.stringify(existing))
-  } catch (error) {
-    console.error('Failed to save checklist:', error)
+  const existing = loadChecklists()
+  existing[checklist.id] = {
+    ...checklist,
+    lastUpdated: new Date().toISOString()
   }
+  writeJSON(localStorage, STORAGE_KEYS.checklists, existing)
 }
 
 // Load all checklists from localStorage
 export function loadChecklists(): Record<string, ChecklistState> {
-  try {
-    return JSON.parse(localStorage.getItem('d2forge-checklists') || '{}')
-  } catch (error) {
-    console.error('Failed to load checklists:', error)
-    return {}
-  }
+  return readJSON<Record<string, ChecklistState>>(localStorage, STORAGE_KEYS.checklists, {})
 }
 
 // Delete checklist from localStorage
 export function deleteChecklist(checklistId: string): void {
-  try {
-    const existing = JSON.parse(localStorage.getItem('d2forge-checklists') || '{}')
-    const deletedChecklist = existing[checklistId]
-    delete existing[checklistId]
-    localStorage.setItem('d2forge-checklists', JSON.stringify(existing))
-    
-    // Remove from saved solutions tracking
-    if (deletedChecklist) {
-      removeSavedSolution(deletedChecklist)
-    }
-    
-    // Notify other components that a checklist was deleted
-    window.dispatchEvent(new CustomEvent('checklistDeleted', { 
-      detail: { checklistId, checklist: deletedChecklist } 
-    }))
-  } catch (error) {
-    console.error('Failed to delete checklist:', error)
+  const existing = loadChecklists()
+  const deletedChecklist = existing[checklistId]
+  delete existing[checklistId]
+  writeJSON(localStorage, STORAGE_KEYS.checklists, existing)
+
+  // Remove from saved solutions tracking
+  if (deletedChecklist) {
+    removeSavedSolution(deletedChecklist)
   }
+
+  // Notify other components that a checklist was deleted
+  window.dispatchEvent(new CustomEvent('checklistDeleted', {
+    detail: { checklistId, checklist: deletedChecklist }
+  }))
 }
 
 // Remove solution from saved solutions tracking
 function removeSavedSolution(checklist: ChecklistState): void {
-  try {
-    const solutionId = checklist.solutionData?.originalSolutionId
-    if (solutionId) {
-      const saved = sessionStorage.getItem('d2forge-saved-solutions')
-      if (saved) {
-        const savedSolutions = new Set(JSON.parse(saved))
-        savedSolutions.delete(solutionId)
-        sessionStorage.setItem('d2forge-saved-solutions', JSON.stringify(Array.from(savedSolutions)))
-      }
-    }
-  } catch (error) {
-    console.warn('Failed to remove saved solution:', error)
-  }
+  const solutionId = checklist.solutionData?.originalSolutionId
+  if (!solutionId) return
+
+  const savedSolutions = new Set(readJSON<string[]>(sessionStorage, STORAGE_KEYS.savedSolutions, []))
+  savedSolutions.delete(solutionId)
+  writeJSON(sessionStorage, STORAGE_KEYS.savedSolutions, Array.from(savedSolutions))
 }

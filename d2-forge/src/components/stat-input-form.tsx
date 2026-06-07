@@ -15,8 +15,8 @@ import { MobileTooltip } from '@/components/mobile-tooltip'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Info, Lock } from 'lucide-react'
 import { StatIcon } from '@/components/stat-icon'
-
-const STAT_NAMES = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"] as const
+import { STAT_NAMES, MAX_POSSIBLE_TOTAL, STORAGE_KEYS } from '@/lib/constants'
+import { readJSON, writeJSON } from '@/lib/storage'
 
 // Map each Perk 1 to its available Perk 2 options (from main.py CLASS_ITEM_ROLLS)
 const EXOTIC_PERK_MAPPING = {
@@ -141,22 +141,12 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
   }), [])
 
   // Load persisted state from sessionStorage first
-  const loadPersistedState = (): Partial<FormData> => {
-    try {
-      const saved = sessionStorage.getItem('d2forge-form-state')
-      return saved ? JSON.parse(saved) : {}
-    } catch {
-      return {}
-    }
-  }
+  const loadPersistedState = (): Partial<FormData> =>
+    readJSON<Partial<FormData>>(sessionStorage, STORAGE_KEYS.formState, {})
 
   // Save state to sessionStorage
   const saveFormState = (data: Partial<FormData>) => {
-    try {
-      sessionStorage.setItem('d2forge-form-state', JSON.stringify(data))
-    } catch (error) {
-      console.warn('Failed to save form state:', error)
-    }
+    writeJSON(sessionStorage, STORAGE_KEYS.formState, data)
   }
   
   const form = useForm<FormData>({
@@ -191,7 +181,7 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
 
   const watchedValues = form.watch()
   const totalStats = STAT_NAMES.reduce((sum, statName) => sum + (watchedValues[statName] || 0), 0)
-  const maxPossibleStats = 515 // 5 pieces * 103 max per piece (with balanced tuning)
+  const maxPossibleStats = MAX_POSSIBLE_TOTAL
   
   // Check if selected perk combination is valid
   const isValidPerkCombination = () => {

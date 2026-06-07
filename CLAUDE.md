@@ -8,7 +8,7 @@ This is D2 Forge, a Destiny 2 armor build optimizer deployed on Vercel. The proj
 
 - **Frontend**: Next.js 15 with TypeScript (`d2-forge/` directory)
 - **Backend**: Python Vercel Functions for optimization (`d2-forge/api/` directory)
-- **Working Directory**: Always work from `/Users/brandonyee/PycharmProjects/D2Forge/d2-forge/` for all operations
+- **Working Directory**: Always work from `/Users/brandonyee/repos/D2Forge/d2-forge/` for all operations
 
 ## Development Commands
 
@@ -36,9 +36,15 @@ npm run lint         # Run ESLint for code quality
 - **Theme System**: Uses next-themes with dark/light mode support
 
 ### Backend Architecture (`api/`)
+- **Optimize Endpoint**: `api/optimize.py` - POST `/api/optimize` handler; applies rate limiting and caching, then calls the solver
 - **Main Optimizer**: `api/main.py` - Core MILP optimization using PuLP library
 - **Exotic Data**: `api/exotic_class_items.py` - Fixed exotic class item stat distributions
+- **Exotic Perks**: `api/exotic-perks.py` - GET `/api/exotic-perks` endpoint, returns valid perk combinations
 - **Stats Info**: `api/stats-info.py` - Stat information endpoints
+- **Caching**: `api/cache.py` - File-based response cache (`/tmp`), 2-hour TTL; keyed by SHA256 of the request
+- **Rate Limiting**: `api/rate_limiter.py` - In-memory per-IP limiter (4 requests / 60s)
+
+Note: cache files in `/tmp` and the in-memory rate-limiter state are ephemeral on Vercel — they do not persist reliably across serverless invocations or instances, so both are best-effort.
 
 ### State Management
 - **Form State**: React Hook Form with Zod validation
@@ -102,7 +108,7 @@ The StatInputForm component includes complex validation for:
 ### Optimization Logic
 The solver in `main.py` uses a two-phase approach:
 1. **Exact solutions**: No timeout, finds perfect matches
-2. **Approximate solutions**: 30-second timeout for closest approximations
+2. **Approximate solutions**: Time-limited search for closest approximations. The production `/api/optimize` endpoint passes `total_timeout=15` (15 seconds); `solve_with_milp_multiple()` itself defaults to 120s.
 
 ### API Integration
 Frontend communicates with Vercel Functions at `/api/optimize` endpoint, passing:

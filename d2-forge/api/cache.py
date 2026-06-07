@@ -1,15 +1,21 @@
 import hashlib
 import json
 import os
+import sys
 import time
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional
+
+# Ensure sibling modules are importable regardless of import order
+sys.path.append(os.path.dirname(__file__))
+
+from config import CACHE_TTL_SECONDS
 
 class ResponseCache:
     """Simple file-based cache for optimization responses."""
-    
-    def __init__(self, cache_dir: str = "/tmp/d2forge_cache", ttl_seconds: int = 3600):
+
+    def __init__(self, cache_dir: str = "/tmp/d2forge_cache", ttl_seconds: int = CACHE_TTL_SECONDS):
         self.cache_dir = cache_dir
-        self.ttl_seconds = ttl_seconds  # 1 hour default
+        self.ttl_seconds = ttl_seconds
         self._ensure_cache_dir()
     
     def _ensure_cache_dir(self):
@@ -118,6 +124,5 @@ class ResponseCache:
         except Exception:
             pass
 
-# Global cache instance
-# Set TTL to 2 hours for optimization responses since they're deterministic
-optimization_cache = ResponseCache(ttl_seconds=7200)
+# Global cache instance (TTL configured in config.py)
+optimization_cache = ResponseCache()
