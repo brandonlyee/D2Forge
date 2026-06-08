@@ -9,23 +9,9 @@ import { StatIcon } from '@/components/stat-icon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { expandSolutionToChecklist, saveChecklist } from '@/lib/checklist-utils'
-
-interface PieceType {
-  arch: string
-  tertiary: string
-  tuning_mode: string // "none", "tuned", "balanced"
-  mod_target: string
-  tuned_stat?: string | null
-  siphon_from?: string | null
-}
-
-interface Solution {
-  pieces: Record<string, number> // PieceType as string key -> count
-  deviation: number
-  actualStats?: number[]
-  tuningRequirements?: Record<string, Array<{count: number, siphon_from: string}>> // stat -> array of tuning details
-  flexiblePieces?: number // count of pieces that can accept any +5/-5 tuning
-}
+import type { PieceType, Solution } from '@/types/solution'
+import { STAT_NAMES, STORAGE_KEYS } from '@/lib/constants'
+import { readJSON, writeJSON, parsePiece } from '@/lib/storage'
 
 interface SolutionDisplayProps {
   solutions: Solution[]
@@ -34,25 +20,18 @@ interface SolutionDisplayProps {
   error?: string | null
 }
 
-const STAT_NAMES = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"]
-
 export function SolutionDisplay({ solutions, desiredStats, isLoading = false, error = null }: SolutionDisplayProps) {
   // Load saved solution states from sessionStorage synchronously for initial render
   const getInitialButtonStates = (): Record<number, 'idle' | 'editing' | 'saving' | 'saved'> => {
-    try {
-      const saved = sessionStorage.getItem('d2forge-saved-solutions')
-      const savedSolutions = new Set(saved ? JSON.parse(saved) : [])
-      const initialStates: Record<number, 'idle' | 'editing' | 'saving' | 'saved'> = {}
-      
-      solutions.forEach((solution, index) => {
-        const solutionId = JSON.stringify(solution.pieces)
-        initialStates[index] = savedSolutions.has(solutionId) ? 'saved' : 'idle'
-      })
-      
-      return initialStates
-    } catch {
-      return {}
-    }
+    const savedSolutions = new Set(readJSON<string[]>('session', STORAGE_KEYS.savedSolutions, []))
+    const initialStates: Record<number, 'idle' | 'editing' | 'saving' | 'saved'> = {}
+
+    solutions.forEach((solution, index) => {
+      const solutionId = JSON.stringify(solution.pieces)
+      initialStates[index] = savedSolutions.has(solutionId) ? 'saved' : 'idle'
+    })
+
+    return initialStates
   }
 
   const [buttonStates, setButtonStates] = useState<Record<number, 'idle' | 'editing' | 'saving' | 'saved'>>(getInitialButtonStates)
@@ -64,24 +43,14 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
   }
 
   // Load saved solution states from sessionStorage
-  const loadSavedSolutions = (): Set<string> => {
-    try {
-      const saved = sessionStorage.getItem('d2forge-saved-solutions')
-      return new Set(saved ? JSON.parse(saved) : [])
-    } catch {
-      return new Set()
-    }
-  }
+  const loadSavedSolutions = (): Set<string> =>
+    new Set(readJSON<string[]>('session', STORAGE_KEYS.savedSolutions, []))
 
   // Save solution as saved to sessionStorage
   const markSolutionAsSaved = (solutionId: string) => {
-    try {
-      const savedSolutions = loadSavedSolutions()
-      savedSolutions.add(solutionId)
-      sessionStorage.setItem('d2forge-saved-solutions', JSON.stringify(Array.from(savedSolutions)))
-    } catch (error) {
-      console.warn('Failed to save solution state:', error)
-    }
+    const savedSolutions = loadSavedSolutions()
+    savedSolutions.add(solutionId)
+    writeJSON('session', STORAGE_KEYS.savedSolutions, Array.from(savedSolutions))
   }
 
   // Update button states when solutions change or checklist is deleted
@@ -350,25 +319,22 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                     const groupedPieces: Record<string, { pieces: Array<{piece: PieceType, count: number}>, totalCount: number }> = {}
                     
                     Object.entries(solution.pieces).forEach(([pieceKey, count]) => {
-                      try {
-                        const piece: PieceType = JSON.parse(pieceKey)
-                        
-                        // Create grouping key without mod_target and specific tuning details
-                        const groupKey = JSON.stringify({
-                          arch: piece.arch,
-                          tertiary: piece.tertiary,
-                          tuning_mode: piece.tuning_mode === "tuned" ? "flexible" : piece.tuning_mode // Group tuned pieces as "flexible"
-                        })
-                        
-                        if (!groupedPieces[groupKey]) {
-                          groupedPieces[groupKey] = { pieces: [], totalCount: 0 }
-                        }
-                        
-                        groupedPieces[groupKey].pieces.push({ piece, count })
-                        groupedPieces[groupKey].totalCount += count
-                      } catch {
-                        // Handle malformed pieces
+                      const piece = parsePiece(pieceKey)
+                      if (!piece) return
+
+                      // Create grouping key without mod_target and specific tuning details
+                      const groupKey = JSON.stringify({
+                        arch: piece.arch,
+                        tertiary: piece.tertiary,
+                        tuning_mode: piece.tuning_mode === "tuned" ? "flexible" : piece.tuning_mode // Group tuned pieces as "flexible"
+                      })
+
+                      if (!groupedPieces[groupKey]) {
+                        groupedPieces[groupKey] = { pieces: [], totalCount: 0 }
                       }
+
+                      groupedPieces[groupKey].pieces.push({ piece, count })
+                      groupedPieces[groupKey].totalCount += count
                     })
                     
                     return Object.entries(groupedPieces).map(([, group], groupIndex) => {
@@ -454,12 +420,9 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
                     const modCounts: Record<string, number> = {}
                     
                     Object.entries(solution.pieces).forEach(([pieceKey, count]) => {
-                      try {
-                        const piece: PieceType = JSON.parse(pieceKey)
-                        modCounts[piece.mod_target] = (modCounts[piece.mod_target] || 0) + count
-                      } catch {
-                        // Handle malformed piece data
-                      }
+                      const piece = parsePiece(pieceKey)
+                      if (!piece) return
+                      modCounts[piece.mod_target] = (modCounts[piece.mod_target] || 0) + count
                     })
                     
                     return Object.entries(modCounts).map(([stat, count], index) => (

@@ -7,12 +7,9 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { ClipboardList } from 'lucide-react'
 import Link from 'next/link'
-
-interface Solution {
-  pieces: Record<string, number>
-  deviation: number
-  actualStats?: number[]
-}
+import type { Solution } from '@/types/solution'
+import { STORAGE_KEYS } from '@/lib/constants'
+import { readJSON, writeJSON } from '@/lib/storage'
 
 interface FormData {
   Health: number
@@ -50,28 +47,16 @@ export default function Home() {
 
   // Restore solutions and desiredStats from sessionStorage on component mount
   useEffect(() => {
-    try {
-      const savedState = sessionStorage.getItem('d2forge-main-state')
-      if (savedState) {
-        const { solutions: savedSolutions, desiredStats: savedStats } = JSON.parse(savedState)
-        if (savedSolutions) setSolutions(savedSolutions)
-        if (savedStats) setDesiredStats(savedStats)
-      }
-    } catch (error) {
-      console.warn('Failed to restore main page state:', error)
-    }
+    const saved = readJSON<{ solutions?: Solution[]; desiredStats?: Record<string, number> } | null>(
+      'session', STORAGE_KEYS.mainState, null
+    )
+    if (saved?.solutions) setSolutions(saved.solutions)
+    if (saved?.desiredStats) setDesiredStats(saved.desiredStats)
   }, [])
 
   // Save solutions and desiredStats to sessionStorage whenever they change
   useEffect(() => {
-    try {
-      sessionStorage.setItem('d2forge-main-state', JSON.stringify({
-        solutions,
-        desiredStats
-      }))
-    } catch (error) {
-      console.warn('Failed to save main page state:', error)
-    }
+    writeJSON('session', STORAGE_KEYS.mainState, { solutions, desiredStats })
   }, [solutions, desiredStats])
 
   const handleSubmit = async (data: FormData) => {
