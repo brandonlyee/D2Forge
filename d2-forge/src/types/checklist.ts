@@ -1,3 +1,5 @@
+import type { FragmentSelection } from '@/lib/fragments'
+
 export type ArmorSlot = 'helmet' | 'arms' | 'chest' | 'legs' | 'class'
 
 export interface ChecklistArmorItem {
@@ -41,6 +43,8 @@ export interface ChecklistState {
     targetStats: Record<string, number>
     deviation: number
     originalSolutionId?: string
+    // Subclass fragments this build relies on (baseline stat shifts), if any.
+    fragments?: FragmentSelection
   }
   armorItems: ChecklistArmorItem[]
   modItems: ChecklistModItem[]
