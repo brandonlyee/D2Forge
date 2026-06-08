@@ -1,4 +1,3 @@
-import { Button } from '@/components/ui/button'
 import { ArmorSlotIcon } from '@/components/armor-slot-icon'
 import { ChecklistArmorItem, SlotsUsed, ArmorSlot } from '@/types/checklist'
 import { getAvailableSlots } from '@/lib/checklist-utils'
@@ -10,39 +9,35 @@ interface ArmorSlotButtonsProps {
 }
 
 const SLOT_ORDER: ArmorSlot[] = ['helmet', 'arms', 'chest', 'legs', 'class']
+const SLOT_LABEL: Record<ArmorSlot, string> = {
+  helmet: 'Helmet',
+  arms: 'Arms',
+  chest: 'Chest',
+  legs: 'Legs',
+  class: 'Class Item',
+}
 
 export function ArmorSlotButtons({ item, slotsUsed, onSlotSelect }: ArmorSlotButtonsProps) {
   const availableSlots = getAvailableSlots(item, slotsUsed)
 
   return (
-    <div className="flex gap-1">
+    <div className="slot-btns">
       {SLOT_ORDER.map((slot) => {
         const isAvailable = availableSlots.includes(slot)
         const isSelected = item.assignedSlot === slot
         const isUsed = slotsUsed[slot] && slotsUsed[slot] !== item.id
-        
+
         return (
-          <Button
+          <button
             key={slot}
-            variant={isSelected ? "default" : "outline"}
-            size="sm"
+            type="button"
+            className={'slot-btn' + (isSelected ? ' sel' : '')}
             disabled={!isAvailable && !isSelected}
             onClick={() => onSlotSelect(slot)}
-            className={`
-              p-2 h-10 w-10
-              ${isUsed ? 'opacity-30' : ''}
-              ${isSelected ? 'bg-blue-600 text-white' : ''}
-            `}
-            title={
-              isUsed 
-                ? `${slot} slot already used`
-                : isAvailable || isSelected
-                ? `Assign to ${slot} slot`
-                : `${slot} slot not available for this item`
-            }
+            title={SLOT_LABEL[slot] + (isUsed ? ' — in use' : '')}
           >
-            <ArmorSlotIcon slot={slot} size={20} />
-          </Button>
+            <ArmorSlotIcon slot={slot} size={18} />
+          </button>
         )
       })}
     </div>

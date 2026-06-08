@@ -4,80 +4,87 @@ import React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { Slider } from '@/components/ui/slider'
-import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
-import { MobileTooltip } from '@/components/mobile-tooltip'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Info, Lock } from 'lucide-react'
 import { StatIcon } from '@/components/stat-icon'
+import { Icon } from '@/components/forge/icons'
+import {
+  ForgeSwitch,
+  ForgeSlider,
+  ForgeNumberField,
+  ForgeSelect,
+  ForgeTooltip,
+  type ForgeSelectItem,
+} from '@/components/forge/controls'
 import { STAT_NAMES, MAX_POSSIBLE_TOTAL, STORAGE_KEYS } from '@/lib/constants'
 import { readJSON, writeJSON } from '@/lib/storage'
+import { SUBCLASSES, SUBCLASS_BY_ID, computeFragmentBonuses } from '@/lib/fragments'
 
-// Map each Perk 1 to its available Perk 2 options (from main.py CLASS_ITEM_ROLLS)
+// Map each Perk 1 (left, archetype) to its valid Perk 2 (right, tertiary) options.
+// Mirrors api/exotic_class_items.py CLASS_ITEM_ROLLS: class-agnostic left perks pair
+// with every right perk; class-exclusive left perks pair only with class-agnostic or
+// same-class right perks (class perks cannot be mixed across classes).
 const EXOTIC_PERK_MAPPING = {
-  "Spirit of the Assassin": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity"],
-  "Spirit of Inmost Light": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of Cyrtarachne", "Spirit of the Gyrfalcon", "Spirit of the Wormhusk", "Spirit of the Coyote"],
-  "Spirit of the Dragon": ["Spirit of the Star-Eater", "Spirit of the Coyote", "Spirit of Verity"],
-  "Spirit of the Foe Tracer": ["Spirit of the Star-Eater"],
-  "Spirit of Caliban": ["Spirit of Synthoceps", "Spirit of Cyrtarachne", "Spirit of the Liar"],
-  "Spirit of Renewal": ["Spirit of Cyrtarachne", "Spirit of the Coyote", "Spirit of the Liar"],
-  "Spirit of Severance": ["Spirit of Synthoceps"],
-  "Spirit of the Eternal Warrior": ["Spirit of the Star-Eater", "Spirit of Synthoceps"],
-  "Spirit of the Abeyant": ["Spirit of Synthoceps"],
-  "Spirit of the Bear": ["Spirit of Synthoceps"],
-  "Spirit of the Stag": ["Spirit of Synthoceps"],
-  "Spirit of the Necrotic": ["Spirit of the Star-Eater", "Spirit of Synthoceps"],
-  "Spirit of Osmiomancy": ["Spirit of Verity"],
-  "Spirit of Apotheosis": ["Spirit of Synthoceps"]
+  "Spirit of the Assassin": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of the Coyote", "Spirit of Cyrtarachne", "Spirit of the Gyrfalcon", "Spirit of the Liar", "Spirit of the Wormhusk", "Spirit of Alpha Lupi", "Spirit of Contact", "Spirit of Scars", "Spirit of the Armamentarium", "Spirit of the Horn", "Spirit of Harmony", "Spirit of Starfire", "Spirit of the Claw", "Spirit of the Swarm", "Spirit of Vesper"],
+  "Spirit of Inmost Light": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of the Coyote", "Spirit of Cyrtarachne", "Spirit of the Gyrfalcon", "Spirit of the Liar", "Spirit of the Wormhusk", "Spirit of Alpha Lupi", "Spirit of Contact", "Spirit of Scars", "Spirit of the Armamentarium", "Spirit of the Horn", "Spirit of Harmony", "Spirit of Starfire", "Spirit of the Claw", "Spirit of the Swarm", "Spirit of Vesper"],
+  "Spirit of the Ophidian": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of the Coyote", "Spirit of Cyrtarachne", "Spirit of the Gyrfalcon", "Spirit of the Liar", "Spirit of the Wormhusk", "Spirit of Alpha Lupi", "Spirit of Contact", "Spirit of Scars", "Spirit of the Armamentarium", "Spirit of the Horn", "Spirit of Harmony", "Spirit of Starfire", "Spirit of the Claw", "Spirit of the Swarm", "Spirit of Vesper"],
+  "Spirit of Caliban": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of the Coyote", "Spirit of Cyrtarachne", "Spirit of the Gyrfalcon", "Spirit of the Liar", "Spirit of the Wormhusk"],
+  "Spirit of Galanor": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of the Coyote", "Spirit of Cyrtarachne", "Spirit of the Gyrfalcon", "Spirit of the Liar", "Spirit of the Wormhusk"],
+  "Spirit of Renewal": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of the Coyote", "Spirit of Cyrtarachne", "Spirit of the Gyrfalcon", "Spirit of the Liar", "Spirit of the Wormhusk"],
+  "Spirit of the Dragon": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of the Coyote", "Spirit of Cyrtarachne", "Spirit of the Gyrfalcon", "Spirit of the Liar", "Spirit of the Wormhusk"],
+  "Spirit of the Foe Tracer": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of the Coyote", "Spirit of Cyrtarachne", "Spirit of the Gyrfalcon", "Spirit of the Liar", "Spirit of the Wormhusk"],
+  "Spirit of Hoarfrost": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of Alpha Lupi", "Spirit of Contact", "Spirit of Scars", "Spirit of the Armamentarium", "Spirit of the Horn"],
+  "Spirit of Severance": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of Alpha Lupi", "Spirit of Contact", "Spirit of Scars", "Spirit of the Armamentarium", "Spirit of the Horn"],
+  "Spirit of the Abeyant": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of Alpha Lupi", "Spirit of Contact", "Spirit of Scars", "Spirit of the Armamentarium", "Spirit of the Horn"],
+  "Spirit of the Bear": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of Alpha Lupi", "Spirit of Contact", "Spirit of Scars", "Spirit of the Armamentarium", "Spirit of the Horn"],
+  "Spirit of the Eternal Warrior": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of Alpha Lupi", "Spirit of Contact", "Spirit of Scars", "Spirit of the Armamentarium", "Spirit of the Horn"],
+  "Spirit of Apotheosis": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of Harmony", "Spirit of Starfire", "Spirit of the Claw", "Spirit of the Swarm", "Spirit of Vesper"],
+  "Spirit of Osmiomancy": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of Harmony", "Spirit of Starfire", "Spirit of the Claw", "Spirit of the Swarm", "Spirit of Vesper"],
+  "Spirit of the Stag": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of Harmony", "Spirit of Starfire", "Spirit of the Claw", "Spirit of the Swarm", "Spirit of Vesper"],
+  "Spirit of the Filaments": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of Harmony", "Spirit of Starfire", "Spirit of the Claw", "Spirit of the Swarm", "Spirit of Vesper"],
+  "Spirit of the Necrotic": ["Spirit of the Star-Eater", "Spirit of Synthoceps", "Spirit of Verity", "Spirit of Harmony", "Spirit of Starfire", "Spirit of the Claw", "Spirit of the Swarm", "Spirit of Vesper"],
 } as const
 
-// Complete list of all possible Perk 1 options (including those with no valid combinations yet)
+// Complete list of all possible Perk 1 (left) options
 const ALL_POSSIBLE_PERK1_OPTIONS = [
   "Spirit of the Assassin",
-  "Spirit of Inmost Light", 
+  "Spirit of Inmost Light",
   "Spirit of the Ophidian",
-  "Spirit of the Dragon",
-  "Spirit of Galanor",
-  "Spirit of the Foe Tracer",
   "Spirit of Caliban",
+  "Spirit of Galanor",
   "Spirit of Renewal",
-  "Spirit of Severance",
+  "Spirit of the Dragon",
+  "Spirit of the Foe Tracer",
   "Spirit of Hoarfrost",
-  "Spirit of the Eternal Warrior",
+  "Spirit of Severance",
   "Spirit of the Abeyant",
   "Spirit of the Bear",
+  "Spirit of the Eternal Warrior",
+  "Spirit of Apotheosis",
+  "Spirit of Osmiomancy",
   "Spirit of the Stag",
   "Spirit of the Filaments",
   "Spirit of the Necrotic",
-  "Spirit of Osmiomancy",
-  "Spirit of Apotheosis"
 ] as const
 
-// Complete list of all possible Perk 2 options (including those with no valid combinations yet)
+// Complete list of all possible Perk 2 (right) options
 const ALL_POSSIBLE_PERK2_OPTIONS = [
   "Spirit of the Star-Eater",
   "Spirit of Synthoceps",
   "Spirit of Verity",
+  "Spirit of the Coyote",
   "Spirit of Cyrtarachne",
   "Spirit of the Gyrfalcon",
   "Spirit of the Liar",
   "Spirit of the Wormhusk",
-  "Spirit of the Coyote",
+  "Spirit of Alpha Lupi",
   "Spirit of Contact",
   "Spirit of Scars",
-  "Spirit of the Horn",
-  "Spirit of the Alpha Lupi",
   "Spirit of the Armamentarium",
-  "Spirit of the Vesper",
-  "Spirit of the Harmony",
-  "Spirit of the Swarm",
+  "Spirit of the Horn",
+  "Spirit of Harmony",
+  "Spirit of Starfire",
   "Spirit of the Claw",
-  "Spirit of Starfire"
+  "Spirit of the Swarm",
+  "Spirit of Vesper",
 ] as const
 
 // Reverse mapping for when Perk 2 is selected first
@@ -104,10 +111,14 @@ const formSchema = z.object({
   Class_min: z.boolean(),
   Weapons_min: z.boolean(),
   allow_tuned: z.boolean(),
-  use_exotic: z.boolean(),
   use_class_item_exotic: z.boolean(),
   exotic_perk1: z.string().optional(),
   exotic_perk2: z.string().optional(),
+  // Subclass fragments: a baseline-stat module. `fragment_subclass` is the chosen
+  // subclass id; `fragments` are the selected fragment names (all from that subclass).
+  use_fragments: z.boolean(),
+  fragment_subclass: z.string().optional(),
+  fragments: z.array(z.string()),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -134,10 +145,12 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
     Class_min: false,
     Weapons_min: false,
     allow_tuned: true,
-    use_exotic: false,
     use_class_item_exotic: false,
     exotic_perk1: '',
     exotic_perk2: '',
+    use_fragments: false,
+    fragment_subclass: '',
+    fragments: [] as string[],
   }), [])
 
   // Load persisted state from sessionStorage first
@@ -181,11 +194,20 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
 
   const watchedValues = form.watch()
   const totalStats = STAT_NAMES.reduce((sum, statName) => sum + (watchedValues[statName] || 0), 0)
-  const maxPossibleStats = MAX_POSSIBLE_TOTAL
+
+  // Selected fragments shift the baseline stats, which shifts the maximum achievable total
+  // by the net of all their effects (e.g. one +10 fragment raises the max from 515 to 525).
+  const selectedFragments = watchedValues.use_fragments ? watchedValues.fragments || [] : []
+  const fragmentBonuses = computeFragmentBonuses(selectedFragments)
+  const fragmentNet = STAT_NAMES.reduce((sum, statName) => sum + fragmentBonuses[statName], 0)
+  const maxPossibleStats = MAX_POSSIBLE_TOTAL + fragmentNet
+  const activeSubclass = watchedValues.fragment_subclass
+    ? SUBCLASS_BY_ID[watchedValues.fragment_subclass]
+    : undefined
   
   // Check if selected perk combination is valid
   const isValidPerkCombination = () => {
-    if (!watchedValues.use_exotic || !watchedValues.use_class_item_exotic) return true
+    if (!watchedValues.use_class_item_exotic) return true
     if (!watchedValues.exotic_perk1 || !watchedValues.exotic_perk2) return true
     
     const perk1 = watchedValues.exotic_perk1
@@ -229,334 +251,348 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
   
   // Check if perks are missing when exotic class item is enabled
   const hasMissingPerks = () => {
-    if (!watchedValues.use_exotic || !watchedValues.use_class_item_exotic) return false
+    if (!watchedValues.use_class_item_exotic) return false
     return !watchedValues.exotic_perk1 || !watchedValues.exotic_perk2
   }
 
+  // Direct field writers for the custom forge controls (RHF stays the source of truth).
+  const setField = (name: keyof FormData, value: unknown) =>
+    form.setValue(name, value as never, { shouldValidate: true })
+
+  // Switch subclass. Since only one subclass's fragments may be equipped at a time, changing
+  // the subclass clears any previously-selected fragments.
+  const selectSubclass = (id: string) => {
+    setField('fragment_subclass', id)
+    setField('fragments', [])
+  }
+
+  // Toggle a single fragment on/off within the active subclass.
+  const toggleFragment = (name: string) => {
+    const current = watchedValues.fragments || []
+    const next = current.includes(name)
+      ? current.filter((f) => f !== name)
+      : [...current, name]
+    setField('fragments', next)
+  }
+
+  const over = totalStats > maxPossibleStats
+  const meterPct = Math.min(100, (totalStats / maxPossibleStats) * 100)
+
+  // Build perk dropdown items with validity-based disabling (logic preserved).
+  const perk1Items: ForgeSelectItem[] = ALL_POSSIBLE_PERK1_OPTIONS.map((perk) => {
+    const availableOptions = getAvailablePerk1Options()
+    const isAvailable = (availableOptions as readonly string[]).includes(perk)
+    const disabled = Boolean(
+      watchedValues.exotic_perk2 && !isAvailable && availableOptions.length < ALL_POSSIBLE_PERK1_OPTIONS.length
+    )
+    return { value: perk, label: perk, disabled }
+  })
+  const perk2Items: ForgeSelectItem[] = ALL_POSSIBLE_PERK2_OPTIONS.map((perk) => {
+    const availableOptions = getAvailablePerk2Options()
+    const isAvailable = (availableOptions as readonly string[]).includes(perk)
+    const disabled = Boolean(
+      watchedValues.exotic_perk1 && !isAvailable && availableOptions.length < ALL_POSSIBLE_PERK2_OPTIONS.length
+    )
+    return { value: perk, label: perk, disabled }
+  })
+
+  const submitDisabled =
+    isLoading ||
+    hasMissingPerks() ||
+    (watchedValues.use_class_item_exotic && !isValidPerkCombination())
+
   return (
-    <Card className="w-full max-w-2xl">
-      <CardHeader className="pb-4 sm:pb-6">
-        <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-          <span className="text-xl sm:text-2xl">⚔️</span>
-          <span className="hidden sm:inline">Destiny 2 Stat Optimizer</span>
-          <span className="sm:hidden">D2 Optimizer</span>
-          <MobileTooltip
-            content="Currently, we are not accounting for stat modifications from Subclass Fragments, or Fonts. Please input your desired stats accordingly."
-            side="bottom"
-          >
-            <Info className="h-4 w-4" suppressHydrationWarning />
-          </MobileTooltip>
-        </CardTitle>
-        <CardDescription className="text-sm">
-          Enter your desired stat distribution. The optimizer will find the best armor combinations.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              {STAT_NAMES.map((statName) => (
-                <FormField
-                  key={statName}
-                  control={form.control}
-                  name={statName}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <StatIcon stat={statName} size={20} />
-                          {statName}
-                        </div>
-                        <FormField
-                          control={form.control}
-                          name={`${statName}_min` as keyof FormData}
-                          render={({ field: lockField }) => (
-                            <div className="flex items-center gap-2">
-                              <MobileTooltip
-                                content="Lock as minimum: If possible, solutions must have at least this value"
-                                side="bottom"
-                              >
-                                <div className="flex items-center gap-1">
-                                  <Lock className="h-3 w-3 text-muted-foreground" suppressHydrationWarning />
-                                  <Switch
-                                    checked={Boolean(lockField.value)}
-                                    onCheckedChange={lockField.onChange}
-                                  />
-                                </div>
-                              </MobileTooltip>
-                            </div>
-                          )}
-                        />
-                      </FormLabel>
-                      <FormControl>
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <Input
-                              type="number"
-                              min={0}
-                              max={225}
-                              className="w-16 sm:w-20 text-sm"
-                              {...field}
-                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                              inputMode="numeric"
-                            />
-                            <div className="flex-1">
-                              <Slider
-                                value={[field.value || 0]}
-                                onValueChange={(values) => field.onChange(values[0])}
-                                max={225}
-                                min={0}
-                                step={5}
-                                className="w-full"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              ))}
-            </div>
-
-            {/* Total Stats Display - positioned after sliders for visibility */}
-            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Total Stats:</span>
-                <Badge variant={totalStats > maxPossibleStats ? "destructive" : "default"}>
-                  {totalStats}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                <span>Max Possible: {maxPossibleStats}</span>
-                <MobileTooltip
-                  content="Assuming all Tier 5 armor, five +10 Stat mods, and five Balanced Tuning mods, 515 is the maximum amount of stats that can be provided by a set of armor."
-                  side="bottom"
-                >
-                  <Info className="h-3 w-3" suppressHydrationWarning />
-                </MobileTooltip>
-              </div>
-            </div>
-
-            {totalStats > maxPossibleStats && (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-800">
-                  ⚠️ Your desired stats exceed the maximum possible. The optimizer will find the closest approximation.
-                </p>
-              </div>
-            )}
-
-            <div className="border-t pt-4 space-y-3 sm:space-y-4">
-              <FormField
-                control={form.control}
-                name="allow_tuned"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 sm:p-4">
-                    <div className="space-y-0.5 pr-2">
-                      <FormLabel className="text-sm sm:text-base font-medium">
-                        Allow +5/-5 Tuning Mods
-                      </FormLabel>
-                      <div className="text-xs sm:text-sm text-muted-foreground">
-                        Include armor pieces with +5/-5 stat tuning. These are harder to farm but provide more optimization options.
-                      </div>
+    <form className="form-col" onSubmit={form.handleSubmit(onSubmit)}>
+      <div className="panel form-panel">
+        <div className="panel-head">
+          <span className="corner" />
+          <span className="title">Desired Stats</span>
+        </div>
+        <div className="panel-body">
+          {/* stat rows */}
+          <div>
+            {STAT_NAMES.map((statName) => {
+              const value = watchedValues[statName] || 0
+              const locked = Boolean(watchedValues[`${statName}_min` as keyof FormData])
+              return (
+                <div className="stat" key={statName}>
+                  <div className="stat-top">
+                    <div className="stat-name">
+                      <StatIcon stat={statName} size={18} /> {statName}
                     </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
+                    <label className={"stat-lock" + (locked ? " active" : "")} title="Lock as minimum: solutions must have at least this value">
+                      <Icon.lock className="lk" />
+                      <span className="lbl">Min</span>
+                      <ForgeSwitch
+                        checked={locked}
+                        onChange={(v) => setField(`${statName}_min` as keyof FormData, v)}
+                        ariaLabel={`Lock ${statName} as minimum`}
                       />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="use_exotic"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 sm:p-4">
-                    <div className="space-y-0.5 pr-2">
-                      <FormLabel className="text-sm sm:text-base font-medium flex items-center gap-2">
-                        Use Exotic Armor
-                        <MobileTooltip
-                          content="Forces the use of one exotic armor piece of any archetype. Assumes a maximum stat roll of 63 (30/20/13)."
-                          side="bottom"
-                        >
-                          <Info className="h-4 w-4" suppressHydrationWarning />
-                        </MobileTooltip>
-                      </FormLabel>
-                      <div className="text-xs sm:text-sm text-muted-foreground">
-                        Include one exotic armor piece in the build (30/20/13 stat distribution).
-                      </div>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              
-              {watchedValues.use_exotic && (
-                <FormField
-                  control={form.control}
-                  name="use_class_item_exotic"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base font-medium">
-                          Use Exotic Class Item
-                        </FormLabel>
-                        <div className="text-sm text-muted-foreground">
-                          Use an exotic class item with fixed perk combinations instead of regular exotic armor.
-                        </div>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              )}
-              
-              {watchedValues.use_exotic && watchedValues.use_class_item_exotic && (
-                <div className="rounded-lg border p-4 space-y-4">
-                  <div>
-                    <h4 className="text-base font-medium mb-2 flex items-center gap-2">
-                      Exotic Class Item Perks
-                      <MobileTooltip
-                        content="Some Exotic Class Item perk combinations are not available at this time, due to uncertainty of their stat distributions."
-                        side="bottom"
-                      >
-                        <Info className="h-4 w-4" suppressHydrationWarning />
-                      </MobileTooltip>
-                    </h4>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Select two perks for your exotic class item. Only certain combinations are available.
-                    </p>
+                    </label>
                   </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="exotic_perk1"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>First Perk</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select first perk" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {ALL_POSSIBLE_PERK1_OPTIONS.map((perk) => {
-                                const availableOptions = getAvailablePerk1Options()
-                                const isAvailable = (availableOptions as readonly string[]).includes(perk)
-                                const shouldDisable = Boolean(watchedValues.exotic_perk2 && !isAvailable && availableOptions.length < ALL_POSSIBLE_PERK1_OPTIONS.length)
-                                return (
-                                  <SelectItem 
-                                    key={perk} 
-                                    value={perk}
-                                    disabled={shouldDisable}
-                                    className={shouldDisable ? "opacity-50" : ""}
-                                  >
-                                    {perk}
-                                  </SelectItem>
-                                )
-                              })}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="exotic_perk2"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Second Perk</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select second perk" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {ALL_POSSIBLE_PERK2_OPTIONS.map((perk) => {
-                                const availableOptions = getAvailablePerk2Options()
-                                const isAvailable = (availableOptions as readonly string[]).includes(perk)
-                                const shouldDisable = Boolean(watchedValues.exotic_perk1 && !isAvailable && availableOptions.length < ALL_POSSIBLE_PERK2_OPTIONS.length)
-                                return (
-                                  <SelectItem 
-                                    key={perk} 
-                                    value={perk}
-                                    disabled={shouldDisable}
-                                    className={shouldDisable ? "opacity-50" : ""}
-                                  >
-                                    {perk}
-                                  </SelectItem>
-                                )
-                              })}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                  <div className="stat-ctl">
+                    <ForgeNumberField value={value} onChange={(v) => setField(statName, v)} />
+                    <ForgeSlider
+                      value={value}
+                      onChange={(v) => setField(statName, v)}
+                      locked={locked}
+                      floor={locked ? value : null}
                     />
                   </div>
-                  
+                </div>
+              )
+            })}
+          </div>
+
+          {/* total bar */}
+          <div className={"totalbar" + (over ? " over" : "")}>
+            <div className="l">
+              <span className="cap">Total</span>
+              <span className="val">{totalStats}</span>
+            </div>
+            <div className="r">
+              <div className={"meter" + (over ? " over" : "")}>
+                <span style={{ width: meterPct + "%" }} />
+              </div>
+              <span>MAX {maxPossibleStats}</span>
+              <ForgeTooltip>
+                Assuming all Tier 5 armor, five +10 stat mods, and five Balanced Tuning mods, 515 is
+                the maximum total a set of armor can provide.
+                {fragmentNet !== 0 && (
+                  <>
+                    {' '}Selected fragments shift the baseline by {fragmentNet > 0 ? '+' : ''}
+                    {fragmentNet}, so the max is now {maxPossibleStats}.
+                  </>
+                )}
+              </ForgeTooltip>
+            </div>
+          </div>
+          {over && (
+            <div className="notice warn">
+              <Icon.alert className="ic" />
+              <span>
+                Desired stats exceed the maximum possible. The optimizer will return the closest
+                achievable approximation.
+              </span>
+            </div>
+          )}
+
+          <div className="divider" />
+
+          {/* options */}
+          <div className="opt-stack">
+          <div className="opt-row">
+            <div className="opt-main">
+              <div className="opt-label">Allow +5 / −5 Tuning Mods</div>
+              <div className="opt-desc">
+                Include pieces with ±5 stat tuning. Harder to farm, but unlock more optimization
+                headroom.
+              </div>
+            </div>
+            <ForgeSwitch
+              checked={watchedValues.allow_tuned}
+              onChange={(v) => setField("allow_tuned", v)}
+              ariaLabel="Allow tuning mods"
+            />
+          </div>
+
+          <div className="opt-row">
+            <div className="opt-main">
+              <div className="opt-label">
+                Use Exotic Class Item
+                <ForgeTooltip>
+                  Exotic class item stat distributions are determined by their exotic perk
+                  combinations — each combo has a pre-determined primary, secondary, and tertiary
+                  stat. (Regular exotic armor now shares the same 30/25/20 roll and tuning as
+                  legendary armor, so requiring one wouldn&apos;t constrain the result.)
+                </ForgeTooltip>
+              </div>
+              <div className="opt-desc">
+                Force one exotic class item with two fixed perks into the build.
+              </div>
+            </div>
+            <ForgeSwitch
+              checked={watchedValues.use_class_item_exotic}
+              onChange={(v) => setField("use_class_item_exotic", v)}
+              ariaLabel="Use exotic class item"
+            />
+          </div>
+
+          {watchedValues.use_class_item_exotic && (
+                <div className="opt-nest">
+                  <div className="opt-label" style={{ marginBottom: 4 }}>
+                    Exotic Class Item Perks
+                    <ForgeTooltip>
+                      Some perk combinations are unavailable while their stat distributions remain
+                      uncertain.
+                    </ForgeTooltip>
+                  </div>
+                  <div className="opt-desc" style={{ marginBottom: 12 }}>
+                    Pick two perks. Only certain combinations are valid.
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div>
+                      <div className="subhead" style={{ margin: "0 0 8px" }}>
+                        First Perk
+                      </div>
+                      <ForgeSelect
+                        value={watchedValues.exotic_perk1}
+                        placeholder="Select first perk"
+                        items={perk1Items}
+                        onChange={(v) => setField("exotic_perk1", v)}
+                      />
+                    </div>
+                    <div>
+                      <div className="subhead" style={{ margin: "0 0 8px" }}>
+                        Second Perk
+                      </div>
+                      <ForgeSelect
+                        value={watchedValues.exotic_perk2}
+                        placeholder="Select second perk"
+                        items={perk2Items}
+                        onChange={(v) => setField("exotic_perk2", v)}
+                      />
+                    </div>
+                  </div>
                   {hasMissingPerks() && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <p className="text-sm text-red-800">
-                        ⚠️ Please select both perks to use exotic class item
-                      </p>
+                    <div className="notice bad" style={{ marginTop: 12 }}>
+                      <Icon.alert className="ic" />
+                      <span>Select both perks to use the exotic class item.</span>
                     </div>
                   )}
-                  
-                  {!isValidPerkCombination() && watchedValues.exotic_perk1 && watchedValues.exotic_perk2 && (
-                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <p className="text-sm text-yellow-800">
-                        ⚠️ Invalid perk combination: {watchedValues.exotic_perk1} + {watchedValues.exotic_perk2}
-                      </p>
-                      <p className="text-sm text-yellow-700 mt-1">
-                        Try selecting one perk first to see available options for the second perk.
-                      </p>
+                  {!isValidPerkCombination() &&
+                    watchedValues.exotic_perk1 &&
+                    watchedValues.exotic_perk2 && (
+                      <div className="notice warn" style={{ marginTop: 12 }}>
+                        <Icon.alert className="ic" />
+                        <span>
+                          Invalid combination:{" "}
+                          {watchedValues.exotic_perk1.replace("Spirit of ", "")} +{" "}
+                          {watchedValues.exotic_perk2.replace("Spirit of ", "")}. Pick one perk first
+                          to see valid options for the other.
+                        </span>
+                      </div>
+                    )}
+                </div>
+              )}
+
+          <div className="opt-row">
+            <div className="opt-main">
+              <div className="opt-label">
+                Use Subclass Fragments
+                <ForgeTooltip>
+                  Fragments shift your baseline stats before armor is applied. Selecting them
+                  raises (or lowers) your starting stat floor and adjusts the maximum achievable
+                  total accordingly. Only fragments from a single subclass can be equipped at once.
+                </ForgeTooltip>
+              </div>
+              <div className="opt-desc">
+                Factor in the ±10 / −20 baseline stat changes from your equipped subclass fragments.
+              </div>
+            </div>
+            <ForgeSwitch
+              checked={watchedValues.use_fragments}
+              onChange={(v) => setField('use_fragments', v)}
+              ariaLabel="Use subclass fragments"
+            />
+          </div>
+
+          {watchedValues.use_fragments && (
+            <div className="opt-nest">
+              <div className="opt-label" style={{ marginBottom: 8 }}>Subclass</div>
+              <div className="subclass-grid">
+                {SUBCLASSES.map((sc) => {
+                  const active = watchedValues.fragment_subclass === sc.id
+                  return (
+                    <button
+                      type="button"
+                      key={sc.id}
+                      className={'subclass-chip' + (active ? ' active' : '')}
+                      style={active ? { borderColor: sc.accent, color: sc.accent } : undefined}
+                      onClick={() => selectSubclass(sc.id)}
+                    >
+                      <span className="dot" style={{ background: sc.accent }} />
+                      {sc.name}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {activeSubclass && (
+                <div style={{ marginTop: 14 }}>
+                  <div className="subhead" style={{ margin: '0 0 10px' }}>
+                    {activeSubclass.name} Fragments
+                  </div>
+                  <div className="frag-grid">
+                    {activeSubclass.fragments.map((frag) => {
+                      const selected = (watchedValues.fragments || []).includes(frag.name)
+                      return (
+                        <button
+                          type="button"
+                          key={frag.name}
+                          className={'frag-card' + (selected ? ' selected' : '')}
+                          onClick={() => toggleFragment(frag.name)}
+                          aria-pressed={selected}
+                        >
+                          <span className="frag-ico">
+                            {frag.icon ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={frag.icon} alt="" loading="lazy" />
+                            ) : (
+                              <Icon.package className="ph" />
+                            )}
+                          </span>
+                          <span className="frag-meta">
+                            <span className="frag-name">{frag.name}</span>
+                            <span className="frag-effect">
+                              {Object.entries(frag.effects).map(([stat, delta]) => (
+                                <span
+                                  className={'frag-chip ' + (delta > 0 ? 'plus' : 'minus')}
+                                  key={stat}
+                                >
+                                  {delta > 0 ? '+' : ''}{delta}
+                                  <StatIcon stat={stat} size={12} /> {stat}
+                                </span>
+                              ))}
+                            </span>
+                          </span>
+                          {selected && <Icon.check className="frag-check" />}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {selectedFragments.length > 0 && (
+                    <div className="notice info" style={{ marginTop: 12 }}>
+                      <Icon.info className="ic" />
+                      <span>
+                        {selectedFragments.length} fragment{selectedFragments.length !== 1 ? 's' : ''}{' '}
+                        selected · baseline shift{' '}
+                        {STAT_NAMES.filter((s) => fragmentBonuses[s] !== 0)
+                          .map((s) => `${fragmentBonuses[s] > 0 ? '+' : ''}${fragmentBonuses[s]} ${s}`)
+                          .join(', ')}
+                        .
+                      </span>
                     </div>
                   )}
                 </div>
               )}
             </div>
+          )}
 
-            <Button 
-              type="submit" 
-              className="w-full h-12 sm:h-10 text-sm sm:text-base font-medium" 
-              disabled={isLoading || hasMissingPerks() || (watchedValues.use_exotic && watchedValues.use_class_item_exotic && !isValidPerkCombination())}
-            >
-              {isLoading ? (
-                <>
-                  <span className="animate-spin mr-2">⏳</span>
-                  <span className="hidden sm:inline">Optimizing...</span>
-                  <span className="sm:hidden">Optimizing...</span>
-                </>
-              ) : (
-                <>
-                  <span className="hidden sm:inline">Find Optimal Builds</span>
-                  <span className="sm:hidden">Optimize</span>
-                </>
-              )}
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+          </div>
+        </div>
+
+        <div className="panel-foot">
+          <button
+            className="btn primary block"
+            type="submit"
+            disabled={submitDisabled}
+          >
+            {isLoading ? "Optimizing…" : "Find Optimal Builds"}
+          </button>
+        </div>
+      </div>
+    </form>
   )
 }

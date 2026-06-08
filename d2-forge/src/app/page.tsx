@@ -1,15 +1,15 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { StatInputForm } from '@/components/stat-input-form'
 import { SolutionDisplay } from '@/components/solution-display'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { Button } from '@/components/ui/button'
-import { ClipboardList } from 'lucide-react'
+import { Logo, Icon } from '@/components/forge/icons'
 import Link from 'next/link'
 import type { Solution } from '@/types/solution'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { readJSON, writeJSON } from '@/lib/storage'
+import { computeFragmentBonuses, buildFragmentSelection, type FragmentSelection } from '@/lib/fragments'
 
 interface FormData {
   Health: number
@@ -26,10 +26,12 @@ interface FormData {
   Class_min: boolean
   Weapons_min: boolean
   allow_tuned: boolean
-  use_exotic: boolean
   use_class_item_exotic: boolean
   exotic_perk1?: string
   exotic_perk2?: string
+  use_fragments: boolean
+  fragment_subclass?: string
+  fragments: string[]
 }
 
 export default function Home() {
@@ -44,38 +46,55 @@ export default function Home() {
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fragmentSelection, setFragmentSelection] = useState<FragmentSelection | null>(null)
+  const solutionsRef = useRef<HTMLDivElement>(null)
 
-  // Restore solutions and desiredStats from sessionStorage on component mount
+  // Restore solutions, desiredStats, and fragment selection from sessionStorage on mount
   useEffect(() => {
-    const saved = readJSON<{ solutions?: Solution[]; desiredStats?: Record<string, number> } | null>(
-      'session', STORAGE_KEYS.mainState, null
-    )
+    const saved = readJSON<{
+      solutions?: Solution[]
+      desiredStats?: Record<string, number>
+      fragmentSelection?: FragmentSelection | null
+    } | null>('session', STORAGE_KEYS.mainState, null)
     if (saved?.solutions) setSolutions(saved.solutions)
     if (saved?.desiredStats) setDesiredStats(saved.desiredStats)
+    if (saved?.fragmentSelection) setFragmentSelection(saved.fragmentSelection)
   }, [])
 
-  // Save solutions and desiredStats to sessionStorage whenever they change
+  // Save solutions, desiredStats, and fragment selection to sessionStorage whenever they change
   useEffect(() => {
-    writeJSON('session', STORAGE_KEYS.mainState, { solutions, desiredStats })
-  }, [solutions, desiredStats])
+    writeJSON('session', STORAGE_KEYS.mainState, { solutions, desiredStats, fragmentSelection })
+  }, [solutions, desiredStats, fragmentSelection])
 
   const handleSubmit = async (data: FormData) => {
     setIsLoading(true)
     setError(null) // Clear previous errors
-    
+
+    // On stacked (mobile/narrow) layouts the form sits above the solutions, so
+    // bring the results into view once the loading state renders. On wide
+    // layouts the solutions are already visible in the right column.
+    if (typeof window !== 'undefined' && window.innerWidth <= 1040) {
+      requestAnimationFrame(() =>
+        solutionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      )
+    }
+
     // Extract only the stat values for display, excluding optimization options
-    const { 
-      allow_tuned, use_exotic, use_class_item_exotic, exotic_perk1, exotic_perk2,
+    const {
+      allow_tuned, use_class_item_exotic, exotic_perk1, exotic_perk2,
+      use_fragments, fragment_subclass, fragments,
       Health_min, Melee_min, Grenade_min, Super_min, Class_min, Weapons_min,
-      ...statValues 
+      ...statValues
     } = data
     setDesiredStats(statValues)
+    // Snapshot the fragments chosen for this run so results and saved checklists record them.
+    setFragmentSelection(buildFragmentSelection(fragment_subclass, use_fragments ? fragments : []))
     setSolutions([]) // Clear previous results
 
     try {
       // Prepare exotic perks array for backend
-      const exotic_perks = (use_exotic && use_class_item_exotic && exotic_perk1 && exotic_perk2) 
-        ? [exotic_perk1, exotic_perk2] 
+      const exotic_perks = (use_class_item_exotic && exotic_perk1 && exotic_perk2)
+        ? [exotic_perk1, exotic_perk2]
         : undefined
 
       // Prepare minimum constraints for backend
@@ -88,10 +107,16 @@ export default function Home() {
         Weapons: Weapons_min ? data.Weapons : null,
       }
 
+      // Subclass fragments shift the player's baseline stats. The backend subtracts these
+      // from the desired/minimum targets before solving, then folds them back into the
+      // reported stats so the results compare true totals against what the user asked for.
+      const fragment_bonuses = computeFragmentBonuses(use_fragments ? fragments : [])
+
       const requestData = {
         ...data,
         exotic_perks,
-        minimum_constraints
+        minimum_constraints,
+        fragment_bonuses,
       }
 
       // Call our Vercel Function directly
@@ -120,84 +145,61 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-4 py-4 sm:py-8">
-        <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
-          {/* Header */}
-          <div className="space-y-3 sm:space-y-4">
-            {/* Mobile and Desktop Navigation */}
-            <div className="flex justify-end items-center gap-2">
-              <Link href="/checklists">
-                <Button variant="outline" size="sm" className="h-8 sm:h-9 px-2 sm:px-3">
-                  <ClipboardList className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">My Checklists</span>
-                  <span className="sm:hidden sr-only">Checklists</span>
-                </Button>
-              </Link>
-              <ThemeToggle />
-            </div>
+    <div className="app-shell">
+      <header className="topbar">
+        <div className="brand">
+          <span className="logo"><Logo /></span>
+          <span className="wordmark">D2 Forge</span>
+          <span className="banner-sub">
+            Destiny 2 Armor 3.0 Stat Optimizer
+            <span className="tip banner-tip" tabIndex={0}>
+              <Icon.info className="tip-ic" />
+              <span className="tip-body">
+                Enter a desired stat distribution and the solver returns the armor combinations
+                that reach it — ranked by how hard they are to farm. Powered by Mixed Integer
+                Linear Programming.
+              </span>
+            </span>
+          </span>
+        </div>
+        <div className="topbar-actions">
+          <span className="topbar-credit hidden lg:inline-flex">
+            Developed by{' '}
+            <a href="https://x.com/mojobukoo" target="_blank" rel="noopener noreferrer">
+              @mojobukoo
+            </a>
+          </span>
+          <a
+            className="btn bmc"
+            href="https://buymeacoffee.com/mojobuko"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <span aria-hidden>☕</span>
+            <span className="hidden sm:inline">Buy me a coffee</span>
+          </a>
+          <Link className="btn primary" href="/checklists">
+            <Icon.list style={{ width: 15, height: 15 }} />
+            <span className="hidden sm:inline">My Checklists</span>
+          </Link>
+          <ThemeToggle />
+        </div>
+      </header>
 
-            {/* Title and Description */}
-            <div className="text-center space-y-3 sm:space-y-4 pt-2 sm:pt-4">
-              <div className="flex items-center justify-center gap-2 sm:gap-3">
-                <img 
-                  src="/d2-forge.svg" 
-                  alt="D2 Forge Logo" 
-                  className="w-8 h-8 sm:w-12 sm:h-12"
-                />
-                <h1 className="text-2xl sm:text-4xl font-bold tracking-tight">
-                  D2 Forge
-                </h1>
-              </div>
-              <p className="text-sm sm:text-xl text-muted-foreground max-w-2xl mx-auto px-2 sm:px-4">
-                Forge optimal Destiny 2 armor builds to achieve your desired stat distribution 
-                using Mixed Integer Linear Programming.
-              </p>
-            </div>
+      <div className="container-forge">
+        <div className="layout">
+          <StatInputForm onSubmit={handleSubmit} isLoading={isLoading} />
+          <div className="sol-col" ref={solutionsRef}>
+            <SolutionDisplay
+              solutions={solutions}
+              desiredStats={desiredStats}
+              fragments={fragmentSelection}
+              isLoading={isLoading}
+              error={error}
+            />
           </div>
-
-          {/* Main Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-8">
-            {/* Stat Input Form */}
-            <div className="lg:col-span-2">
-              <StatInputForm 
-                onSubmit={handleSubmit} 
-                isLoading={isLoading} 
-              />
-            </div>
-
-            {/* Solutions Display */}
-            <div className="lg:col-span-3">
-              <SolutionDisplay 
-                solutions={solutions} 
-                desiredStats={desiredStats}
-                isLoading={isLoading}
-                error={error}
-              />
-            </div>
-          </div>
-
-          {/* Footer */}
-          <footer className="text-center text-sm text-muted-foreground border-t pt-8 space-y-2">
-            <p>
-              Built with Next.js and Python.
-              Uses Mixed Integer Linear Programming (MILP) to find optimal armor builds.
-            </p>
-            <p>
-              Developed by{' '}
-              <a 
-                href="https://x.com/mojobukoo" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:text-blue-400 transition-colors"
-              >
-                @mojobukoo
-              </a>
-              . Please reach out for any suggestions/improvements!
-            </p>
-          </footer>
         </div>
       </div>
-    </main>
+    </div>
   )
 }

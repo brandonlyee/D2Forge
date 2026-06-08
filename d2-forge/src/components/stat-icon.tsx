@@ -17,11 +17,17 @@ const STAT_ICONS: Record<string, string> = {
 
 const ARCHETYPE_TO_PRIMARY_STAT: Record<string, string> = {
   Brawler: 'Melee',
-  Bulwark: 'Health', 
+  Bulwark: 'Health',
   Grenadier: 'Grenade',
   Paragon: 'Super',
   Gunner: 'Weapons',
   Specialist: 'Class',
+  Siegebreaker: 'Health',
+  Skirmisher: 'Melee',
+  Demolitionist: 'Grenade',
+  Colossus: 'Super',
+  Reaver: 'Class',
+  Powerhouse: 'Weapons',
 }
 
 export function StatIcon({ stat, size = 24, className = "" }: StatIconProps) {

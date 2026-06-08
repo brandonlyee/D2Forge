@@ -1,7 +1,6 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ForgeSelect, type ForgeSelectItem } from '@/components/forge/controls'
 import { StatIcon } from '@/components/stat-icon'
 import { ChecklistArmorItem } from '@/types/checklist'
-import { canHaveTuning } from '@/lib/checklist-utils'
 import { STAT_NAMES } from '@/lib/constants'
 
 interface TuningDropdownProps {
@@ -9,44 +8,25 @@ interface TuningDropdownProps {
   onTuningSelect: (tuning: string | null) => void
 }
 
+// Every piece — legendary, regular exotic, and the Exotic Class Item — has a tuning slot.
 export function TuningDropdown({ item, onTuningSelect }: TuningDropdownProps) {
-  if (!canHaveTuning(item)) {
-    return (
-      <div className="text-sm text-muted-foreground py-2 px-3 border rounded">
-        No tuning slot
-      </div>
-    )
-  }
+  const items: ForgeSelectItem[] = [
+    { value: 'none', label: 'None' },
+    ...STAT_NAMES.map((stat) => ({
+      value: stat,
+      label: stat,
+      icon: <StatIcon stat={stat} size={14} />,
+    })),
+  ]
 
   return (
-    <Select
-      value={item.selectedTuning || "none"}
-      onValueChange={(value) => onTuningSelect(value === "none" ? null : value)}
-    >
-      <SelectTrigger className="w-24 sm:w-32 text-xs sm:text-sm">
-        <SelectValue placeholder="Select tuning" />
-      </SelectTrigger>
-      <SelectContent 
-        position="popper" 
-        side="bottom" 
-        align="start"
-        className="w-[--radix-select-trigger-width] min-w-fit"
-        sideOffset={4}
-        avoidCollisions={true}
-        sticky="always"
-      >
-        <SelectItem value="none">
-          <span className="text-muted-foreground">None</span>
-        </SelectItem>
-        {STAT_NAMES.map((stat) => (
-          <SelectItem key={stat} value={stat}>
-            <div className="flex items-center gap-2">
-              <StatIcon stat={stat} size={14} />
-              {stat}
-            </div>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div style={{ width: 150 }}>
+      <ForgeSelect
+        value={item.selectedTuning || 'none'}
+        placeholder="Select"
+        items={items}
+        onChange={(value) => onTuningSelect(value === 'none' ? null : value)}
+      />
+    </div>
   )
 }

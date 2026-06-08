@@ -6,6 +6,7 @@ import {
   SlotsUsed
 } from '@/types/checklist'
 import type { Solution } from '@/types/solution'
+import type { FragmentSelection } from '@/lib/fragments'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { readJSON, writeJSON, parsePiece } from '@/lib/storage'
 
@@ -18,7 +19,8 @@ function generateId(): string {
 export function expandSolutionToChecklist(
   solution: Solution,
   targetStats: Record<string, number>,
-  solutionIndex: number
+  solutionIndex: number,
+  fragments?: FragmentSelection | null
 ): ChecklistState {
   const armorItems: ChecklistArmorItem[] = []
   const modItems: ChecklistModItem[] = []
@@ -34,13 +36,19 @@ export function expandSolutionToChecklist(
       const isExotic = piece.arch.toLowerCase().includes('exotic')
       const isExoticClassItem = piece.arch.toLowerCase().includes('exotic class item')
 
+      // Every piece — including the Exotic Class Item — has an open tuning slot.
+      // Backend "none"/"tuned" both mean the slot can take a +5/-5 mod, so surface
+      // those as "flexible"; only "balanced" is a distinct, fixed tuning choice.
+      const tuningMode: 'flexible' | 'balanced' | 'none' =
+        piece.tuning_mode === 'balanced' ? 'balanced' : 'flexible'
+
       armorItems.push({
         id: generateId(),
         archetype: piece.arch,
         tertiary: piece.tertiary,
         isExotic,
         isExoticClassItem,
-        tuningMode: piece.tuning_mode as 'flexible' | 'balanced' | 'none',
+        tuningMode,
         assignedSlot: null,
         selectedTuning: null,
         isCompleted: false
@@ -97,7 +105,8 @@ export function expandSolutionToChecklist(
     solutionData: {
       targetStats,
       deviation: solution.deviation,
-      originalSolutionId: JSON.stringify(solution.pieces) // Store for deletion tracking
+      originalSolutionId: JSON.stringify(solution.pieces), // Store for deletion tracking
+      ...(fragments ? { fragments } : {})
     },
     armorItems,
     modItems,
@@ -134,11 +143,6 @@ export function getAvailableSlots(
   return (['helmet', 'arms', 'chest', 'legs', 'class'] as const).filter(
     slot => !slotsUsed[slot as keyof SlotsUsed]
   )
-}
-
-// Check if item can have tuning
-export function canHaveTuning(item: ChecklistArmorItem): boolean {
-  return !item.isExotic && !item.isExoticClassItem
 }
 
 // Save checklist to localStorage

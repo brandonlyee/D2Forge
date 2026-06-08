@@ -1,15 +1,28 @@
 "use client"
 
 import React, { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { ArmorSlotButtons } from '@/components/armor-slot-buttons'
 import { TuningDropdown } from '@/components/tuning-dropdown'
 import { StatIcon } from '@/components/stat-icon'
-import { ChecklistState, ArmorSlot } from '@/types/checklist'
+import { FragmentList } from '@/components/fragment-list'
+import { Icon } from '@/components/forge/icons'
+import { ChecklistState, ArmorSlot, ChecklistArmorItem } from '@/types/checklist'
 import { saveChecklist } from '@/lib/checklist-utils'
-import { Copy, Trash2, X } from 'lucide-react'
+import { STAT_NAMES } from '@/lib/constants'
+
+const SLOT_LABEL: Record<ArmorSlot, string> = {
+  helmet: 'Helmet',
+  arms: 'Arms',
+  chest: 'Chest',
+  legs: 'Legs',
+  class: 'Class Item',
+}
+
+function pieceTuningLabel(item: ChecklistArmorItem): string {
+  if (item.tuningMode === 'balanced') return 'Balanced tuning'
+  if (item.tuningMode === 'flexible') return 'Flexible tuning'
+  return 'No tuning slot'
+}
 
 interface ChecklistViewProps {
   checklist: ChecklistState
@@ -19,6 +32,7 @@ interface ChecklistViewProps {
 
 export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewProps) {
   const [deleteState, setDeleteState] = useState<'idle' | 'confirming'>('idle')
+  const [copied, setCopied] = useState(false)
   
   const handleSlotSelect = (itemId: string, slot: ArmorSlot) => {
     const updatedChecklist = { ...checklist }
@@ -121,6 +135,8 @@ export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewPr
   const copyToClipboard = () => {
     const checklistText = generateChecklistText(checklist)
     navigator.clipboard.writeText(checklistText)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
   }
 
   const handleDelete = () => {
@@ -145,179 +161,183 @@ export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewPr
   const totalItems = totalArmor + totalTuning
   const progressPercentage = totalItems > 0 ? Math.round((totalCompleted / totalItems) * 100) : 0
 
+  const isDone = progressPercentage === 100
+
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-4 sm:pb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="space-y-2">
-            <CardTitle className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <span className="text-base sm:text-lg">{checklist.name}</span>
-              <Badge variant={progressPercentage === 100 ? "default" : "secondary"} className="text-xs self-start">
-                {progressPercentage}% Complete
-              </Badge>
-            </CardTitle>
-            <CardDescription className="text-sm">
-              Target: {Object.entries(checklist.solutionData.targetStats)
-                .map(([stat, value]) => `${value} ${stat}`)
-                .join(', ')}
-            </CardDescription>
+    <div className="panel">
+      <div className="ck-head">
+        <div style={{ minWidth: 0 }}>
+          <div className="ck-title">
+            {checklist.name}
+            <span className={'tag ' + (isDone ? 'match' : 'balanced')}>{progressPercentage}% Complete</span>
           </div>
-          <div className="flex gap-2 self-start sm:self-center">
-            <Button variant="outline" size="sm" onClick={copyToClipboard} className="h-8 sm:h-9 px-2 sm:px-3">
-              <Copy className="h-4 w-4 sm:mr-1" />
-              <span className="hidden sm:inline">Copy</span>
-            </Button>
-{deleteState === 'confirming' ? (
-              <div className="flex gap-2">
-                <Button variant="destructive" size="sm" onClick={handleDelete} className="h-8 sm:h-9 px-2 sm:px-3">
-                  <Trash2 className="h-4 w-4 sm:mr-1" />
-                  <span className="hidden sm:inline">Confirm Delete</span>
-                  <span className="sm:hidden">Delete</span>
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleCancelDelete} className="h-8 sm:h-9 px-2">
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <Button variant="outline" size="sm" onClick={handleDelete} className="h-8 sm:h-9 px-2 sm:px-3">
-                <Trash2 className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline">Delete</span>
-                <span className="sm:hidden sr-only">Delete</span>
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Armor Pieces Section */}
-        <div>
-          <h4 className="font-medium mb-3">Armor Pieces to Farm:</h4>
-          <div className="space-y-3">
-            {checklist.armorItems.map((item, index) => (
-              <div key={item.id} className="p-3 border rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium flex items-center gap-1">
-                      {index + 1}. 
-                      <StatIcon stat={item.archetype.replace('Exotic ', '')} size={16} />
-                      {item.archetype}
-                    </span>
-                    {item.isExotic && <Badge variant="destructive" className="text-xs">Exotic</Badge>}
-                  </div>
-                  {item.isCompleted && (
-                    <Badge variant="default" className="text-xs">
-                      {item.assignedSlot === 'class' 
-                        ? 'Class Item' 
-                        : item.assignedSlot 
-                          ? item.assignedSlot.charAt(0).toUpperCase() + item.assignedSlot.slice(1)
-                          : ''
-                      }
-                    </Badge>
-                  )}
-                </div>
-                <div className="text-sm text-muted-foreground mb-3">
-                  Tertiary: <StatIcon stat={item.tertiary} size={14} className="inline mx-1" /> {item.tertiary}
-                  {item.tuningMode === 'flexible' && ' - Flexible tuning'}
-                  {item.tuningMode === 'balanced' && ' - Balanced tuning'}
-                  {item.tuningMode === 'none' && item.isExotic && ' - No tuning slot'}
-                </div>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">Slot:</span>
-                    <ArmorSlotButtons
-                      item={item}
-                      slotsUsed={checklist.slotsUsed}
-                      onSlotSelect={(slot) => handleSlotSelect(item.id, slot)}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">Tuning:</span>
-                    <TuningDropdown
-                      item={item}
-                      onTuningSelect={(tuning) => handleTuningSelect(item.id, tuning)}
-                    />
-                  </div>
-                </div>
-              </div>
+          <div className="ck-target">
+            <span style={{ color: 'var(--faint-foreground)', letterSpacing: '.1em' }}>TARGET</span>
+            {STAT_NAMES.map((stat) => (
+              <span className="ts" key={stat}>
+                <StatIcon stat={stat} size={13} /> <b>{checklist.solutionData.targetStats[stat] ?? 0}</b>
+              </span>
             ))}
           </div>
         </div>
+        <div className="ck-actions">
+          <button className="btn sm" onClick={copyToClipboard}>
+            {copied ? <Icon.check style={{ width: 14, height: 14 }} /> : <Icon.copy style={{ width: 14, height: 14 }} />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+          {deleteState === 'confirming' ? (
+            <>
+              <button className="btn sm danger" onClick={handleDelete}>
+                <Icon.trash style={{ width: 14, height: 14 }} /> Confirm
+              </button>
+              <button className="btn icon sm" onClick={handleCancelDelete} aria-label="Cancel delete">
+                <Icon.x style={{ width: 14, height: 14 }} />
+              </button>
+            </>
+          ) : (
+            <button className="btn icon sm" title="Delete" onClick={handleDelete} aria-label="Delete">
+              <Icon.trash style={{ width: 14, height: 14 }} />
+            </button>
+          )}
+        </div>
+      </div>
 
-        {/* Mods Section */}
-        <div>
-          <h4 className="font-medium mb-3">Mods Needed:</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+      <div className="ck-progress">
+        <div className={'pbar' + (isDone ? ' done' : '')}>
+          <span style={{ width: progressPercentage + '%' }} />
+        </div>
+        <span className={'pval' + (isDone ? ' done' : '')}>
+          {totalCompleted}/{totalItems}
+        </span>
+      </div>
+
+      <div className="panel-body">
+        <div className="ck-grid">
+        <div className="ck-main">
+        {/* Armor pieces to farm */}
+        <div className="sol-section">
+          <div className="subhead">Armor Pieces to Farm</div>
+          {checklist.armorItems.map((item, index) => (
+            <div
+              className={'ck-piece' + (item.isExotic ? ' is-exotic' : '') + (item.isCompleted ? ' done' : '')}
+              key={item.id}
+            >
+              <div className="ck-piece-top">
+                <span className="ck-idx">{String(index + 1).padStart(2, '0')}</span>
+                <div className="ck-pico">
+                  <StatIcon stat={item.isExoticClassItem ? 'Class' : item.archetype.replace('Exotic ', '')} size={17} />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div className="ck-pname">
+                    {item.archetype}
+                    {item.isExotic ? '' : ' Armor'}
+                    {item.isExotic && <span className="tag exotic">Exotic</span>}
+                  </div>
+                  <div className="ck-ptert">
+                    Tertiary: <StatIcon stat={item.tertiary} size={13} /> {item.tertiary} · {pieceTuningLabel(item)}
+                  </div>
+                </div>
+                <span className="pspacer" />
+                {item.isCompleted && item.assignedSlot && (
+                  <span className="done-badge">
+                    <Icon.check /> {SLOT_LABEL[item.assignedSlot]}
+                  </span>
+                )}
+              </div>
+              <div className="ck-controls">
+                <div className="ck-ctl-group">
+                  <span className="gl">Slot</span>
+                  <ArmorSlotButtons
+                    item={item}
+                    slotsUsed={checklist.slotsUsed}
+                    onSlotSelect={(slot) => handleSlotSelect(item.id, slot)}
+                  />
+                </div>
+                <div className="ck-ctl-group">
+                  <span className="gl">Tuning</span>
+                  <TuningDropdown item={item} onTuningSelect={(tuning) => handleTuningSelect(item.id, tuning)} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        </div>
+
+        <div className="ck-side">
+        {/* Subclass fragments this build relies on */}
+        {checklist.solutionData.fragments && (
+          <div className="sol-section">
+            <div className="subhead">Subclass Fragments</div>
+            <FragmentList selection={checklist.solutionData.fragments} />
+          </div>
+        )}
+
+        {/* Mods needed */}
+        <div className="sol-section">
+          <div className="subhead">Mods Needed</div>
+          <div className="mod-grid">
             {checklist.modItems.map((mod) => (
               <div
+                className={'mod-check' + (mod.isCompleted ? ' done' : '')}
                 key={mod.id}
-                className={`flex items-center gap-2 p-2 border rounded cursor-pointer transition-colors ${
-                  mod.isCompleted 
-                    ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
-                    : 'hover:bg-muted/50 dark:hover:bg-muted/20'
-                }`}
                 onClick={() => handleModToggle(mod.id)}
               >
-                <input
-                  type="checkbox"
-                  checked={mod.isCompleted}
-                  onChange={() => {}} // Remove handler to prevent conflicts
-                  className="h-4 w-4 pointer-events-none" // Disable direct clicking on checkbox
-                />
-                <span className={mod.isCompleted ? 'line-through text-muted-foreground' : ''}>
-                  +10 <StatIcon stat={mod.stat} size={16} className="inline mx-1" /> {mod.stat} Mod
+                <span className="box"><Icon.check /></span>
+                <span className={'txt' + (mod.isCompleted ? ' done' : '')}>
+                  +10 <StatIcon stat={mod.stat} size={14} /> {mod.stat} Mod
                 </span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Tuning Requirements Section */}
+        {/* Tuning requirements */}
         {checklist.tuningItems.length > 0 && (
-          <div>
-            <h4 className="font-medium mb-3">Tuning Requirements:</h4>
-            <div className="space-y-2">
-              {checklist.tuningItems.map((tuning) => (
-                <div
-                  key={tuning.id}
-                  className={`p-3 border rounded-lg ${
-                    tuning.isCompleted ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-muted/50'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={tuning.isCompleted}
-                      disabled
-                      className="h-4 w-4 mt-1"
-                    />
-                    <div className="flex-1 space-y-2">
-                      <div className="font-medium flex items-center gap-1 text-sm">
-                        <StatIcon stat={tuning.targetStat} size={16} />
-                        {tuning.targetStat} Tuning:
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 text-sm">
-                        <span className="flex items-center gap-1 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded">
-                          +5 <StatIcon stat={tuning.targetStat} size={14} /> {tuning.targetStat}
-                        </span>
-                        <span className="text-muted-foreground">/</span>
-                        <span className="flex items-center gap-1 bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded">
-                          -5 <StatIcon stat={tuning.siphonStat} size={14} /> {tuning.siphonStat}
-                        </span>
-                      </div>
-                      {tuning.isCompleted && tuning.assignedToItemId && (
-                        <Badge variant="outline" className="text-xs">
-                          Auto-completed
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
+          <div className="sol-section">
+            <div className="subhead">Tuning Requirements</div>
+            {checklist.tuningItems.map((tuning) => (
+              <div className={'tune ck-tune' + (tuning.isCompleted ? ' done' : '')} key={tuning.id}>
+                <div className="th">
+                  <span
+                    className="box"
+                    style={{
+                      width: 15,
+                      height: 15,
+                      border: '1.5px solid var(--border-strong)',
+                      borderRadius: 3,
+                      display: 'inline-grid',
+                      placeItems: 'center',
+                      color: tuning.isCompleted ? 'var(--primary-foreground)' : 'transparent',
+                      background: tuning.isCompleted ? 'var(--success)' : 'transparent',
+                      borderColor: tuning.isCompleted ? 'var(--success)' : 'var(--border-strong)',
+                    }}
+                  >
+                    <Icon.check style={{ width: 10, height: 10 }} />
+                  </span>
+                  <StatIcon stat={tuning.targetStat} size={15} /> {tuning.targetStat} Tuning
                 </div>
-              ))}
-            </div>
+                <div className="pair">
+                  <span className="chiplet plus">
+                    +5 <StatIcon stat={tuning.targetStat} size={13} /> {tuning.targetStat}
+                  </span>
+                  <span className="sep">/</span>
+                  <span className="chiplet minus">
+                    −5 <StatIcon stat={tuning.siphonStat} size={13} /> {tuning.siphonStat}
+                  </span>
+                </div>
+                {tuning.isCompleted && (
+                  <span className="auto">
+                    <Icon.check /> Auto-completed by tuning selection
+                  </span>
+                )}
+              </div>
+            ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+        </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -330,7 +350,19 @@ function generateChecklistText(checklist: ChecklistState): string {
     .map(([stat, value]) => `${value} ${stat}`)
     .join(', ')}`)
   lines.push('')
-  
+
+  const fragments = checklist.solutionData.fragments
+  if (fragments) {
+    lines.push(`SUBCLASS FRAGMENTS (${fragments.subclassName}):`)
+    fragments.fragments.forEach((frag) => {
+      const effect = Object.entries(frag.effects)
+        .map(([stat, delta]) => `${delta > 0 ? '+' : ''}${delta} ${stat}`)
+        .join(', ')
+      lines.push(`- ${frag.name} (${effect})`)
+    })
+    lines.push('')
+  }
+
   lines.push('ARMOR PIECES TO FARM:')
   checklist.armorItems.forEach((item) => {
     const status = item.isCompleted ? '✓' : '□'
