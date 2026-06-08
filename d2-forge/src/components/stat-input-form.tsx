@@ -142,11 +142,11 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
 
   // Load persisted state from sessionStorage first
   const loadPersistedState = (): Partial<FormData> =>
-    readJSON<Partial<FormData>>(sessionStorage, STORAGE_KEYS.formState, {})
+    readJSON<Partial<FormData>>('session', STORAGE_KEYS.formState, {})
 
   // Save state to sessionStorage
   const saveFormState = (data: Partial<FormData>) => {
-    writeJSON(sessionStorage, STORAGE_KEYS.formState, data)
+    writeJSON('session', STORAGE_KEYS.formState, data)
   }
   
   const form = useForm<FormData>({

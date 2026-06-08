@@ -23,7 +23,7 @@ interface SolutionDisplayProps {
 export function SolutionDisplay({ solutions, desiredStats, isLoading = false, error = null }: SolutionDisplayProps) {
   // Load saved solution states from sessionStorage synchronously for initial render
   const getInitialButtonStates = (): Record<number, 'idle' | 'editing' | 'saving' | 'saved'> => {
-    const savedSolutions = new Set(readJSON<string[]>(sessionStorage, STORAGE_KEYS.savedSolutions, []))
+    const savedSolutions = new Set(readJSON<string[]>('session', STORAGE_KEYS.savedSolutions, []))
     const initialStates: Record<number, 'idle' | 'editing' | 'saving' | 'saved'> = {}
 
     solutions.forEach((solution, index) => {
@@ -44,13 +44,13 @@ export function SolutionDisplay({ solutions, desiredStats, isLoading = false, er
 
   // Load saved solution states from sessionStorage
   const loadSavedSolutions = (): Set<string> =>
-    new Set(readJSON<string[]>(sessionStorage, STORAGE_KEYS.savedSolutions, []))
+    new Set(readJSON<string[]>('session', STORAGE_KEYS.savedSolutions, []))
 
   // Save solution as saved to sessionStorage
   const markSolutionAsSaved = (solutionId: string) => {
     const savedSolutions = loadSavedSolutions()
     savedSolutions.add(solutionId)
-    writeJSON(sessionStorage, STORAGE_KEYS.savedSolutions, Array.from(savedSolutions))
+    writeJSON('session', STORAGE_KEYS.savedSolutions, Array.from(savedSolutions))
   }
 
   // Update button states when solutions change or checklist is deleted

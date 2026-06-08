@@ -48,7 +48,7 @@ export default function Home() {
   // Restore solutions and desiredStats from sessionStorage on component mount
   useEffect(() => {
     const saved = readJSON<{ solutions?: Solution[]; desiredStats?: Record<string, number> } | null>(
-      sessionStorage, STORAGE_KEYS.mainState, null
+      'session', STORAGE_KEYS.mainState, null
     )
     if (saved?.solutions) setSolutions(saved.solutions)
     if (saved?.desiredStats) setDesiredStats(saved.desiredStats)
@@ -56,7 +56,7 @@ export default function Home() {
 
   // Save solutions and desiredStats to sessionStorage whenever they change
   useEffect(() => {
-    writeJSON(sessionStorage, STORAGE_KEYS.mainState, { solutions, desiredStats })
+    writeJSON('session', STORAGE_KEYS.mainState, { solutions, desiredStats })
   }, [solutions, desiredStats])
 
   const handleSubmit = async (data: FormData) => {

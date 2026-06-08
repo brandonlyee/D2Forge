@@ -148,12 +148,12 @@ export function saveChecklist(checklist: ChecklistState): void {
     ...checklist,
     lastUpdated: new Date().toISOString()
   }
-  writeJSON(localStorage, STORAGE_KEYS.checklists, existing)
+  writeJSON('local', STORAGE_KEYS.checklists, existing)
 }
 
 // Load all checklists from localStorage
 export function loadChecklists(): Record<string, ChecklistState> {
-  return readJSON<Record<string, ChecklistState>>(localStorage, STORAGE_KEYS.checklists, {})
+  return readJSON<Record<string, ChecklistState>>('local', STORAGE_KEYS.checklists, {})
 }
 
 // Delete checklist from localStorage
@@ -161,7 +161,7 @@ export function deleteChecklist(checklistId: string): void {
   const existing = loadChecklists()
   const deletedChecklist = existing[checklistId]
   delete existing[checklistId]
-  writeJSON(localStorage, STORAGE_KEYS.checklists, existing)
+  writeJSON('local', STORAGE_KEYS.checklists, existing)
 
   // Remove from saved solutions tracking
   if (deletedChecklist) {
@@ -179,7 +179,7 @@ function removeSavedSolution(checklist: ChecklistState): void {
   const solutionId = checklist.solutionData?.originalSolutionId
   if (!solutionId) return
 
-  const savedSolutions = new Set(readJSON<string[]>(sessionStorage, STORAGE_KEYS.savedSolutions, []))
+  const savedSolutions = new Set(readJSON<string[]>('session', STORAGE_KEYS.savedSolutions, []))
   savedSolutions.delete(solutionId)
-  writeJSON(sessionStorage, STORAGE_KEYS.savedSolutions, Array.from(savedSolutions))
+  writeJSON('session', STORAGE_KEYS.savedSolutions, Array.from(savedSolutions))
 }
