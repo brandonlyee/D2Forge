@@ -37,7 +37,6 @@ class ResponseCache:
             'Class': request_data.get('Class', 0),
             'Weapons': request_data.get('Weapons', 0),
             'allow_tuned': request_data.get('allow_tuned', True),
-            'use_exotic': request_data.get('use_exotic', False),
             'use_class_item_exotic': request_data.get('use_class_item_exotic', False),
             'exotic_perks': request_data.get('exotic_perks'),
             'minimum_constraints': request_data.get('minimum_constraints')

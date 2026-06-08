@@ -22,6 +22,12 @@ ARCHETYPES = [
     Archetype("Paragon", "Super", "Melee"),
     Archetype("Gunner", "Weapons", "Grenade"),
     Archetype("Specialist", "Class", "Weapons"),
+    Archetype("Siegebreaker", "Health", "Grenade"),
+    Archetype("Skirmisher", "Melee", "Weapons"),
+    Archetype("Demolitionist", "Grenade", "Class"),
+    Archetype("Colossus", "Super", "Health"),
+    Archetype("Reaver", "Class", "Melee"),
+    Archetype("Powerhouse", "Weapons", "Super"),
 ]
 
 PRIMARY_VAL = 30
@@ -31,10 +37,6 @@ BASE_FIVE = 5
 STANDARD_MOD_VAL = 10
 TUNING_VAL = 5
 MAX_PER_PIECE = PRIMARY_VAL + STANDARD_MOD_VAL + TUNING_VAL  # 45
-
-# Exotic-specific constants
-EXOTIC_SECONDARY_VAL = 20
-EXOTIC_TERTIARY_VAL = 13
 
 # tuning_mode: "none" | "tuned" | "balanced"
 PieceType = namedtuple(
@@ -54,113 +56,128 @@ PieceType = namedtuple(
 from exotic_class_items import CLASS_ITEM_ROLLS
 
 
+def is_exotic_class_item(arch):
+    """True for the Exotic Class Item — the only exotic the solver models as a distinct piece.
+    Its stat roll is fixed by the perk pair, but (like every other piece) it can still take any
+    tuning mod. Regular exotic armor is not modeled separately: post-update it shares the exact
+    30/25/20 distribution and tuning set of legendary armor, so requiring one would never change
+    the achievable stat space."""
+    return str(arch).lower().startswith("exotic class item")
+
+
 # ----------------------------
 # Piece generation (now supports Balanced Tuning correctly)
 # ----------------------------
 
-def generate_piece_types(allow_tuned=True, *, use_exotic=False, use_class_item_exotic=False, exotic_perks=None):
+def _add_piece_variants(piece_types, piece_stats, label, tert, base, balanced_low_indices, allow_tuned):
+    """Append every tuning variant for a single base roll (one label + tertiary).
+
+    For each +10 mod target this emits the three tuning modes shared by *all* pieces —
+    normal armor, regular exotic armor, and the Exotic Class Item alike:
+      (A) none     — open tuning slot, no mod applied (can later take any +5/-5 mod)
+      (B) tuned    — a specific +5/-5 transfer already applied (only if ``allow_tuned``)
+      (C) balanced — Balanced Tuning, +1 to the three lowest stats
+
+    ``base`` is the 6-stat roll BEFORE the +10 mod and BEFORE tuning; ``balanced_low_indices``
+    are the indices that Balanced Tuning bumps by +1.
+    """
+    for mod_target in STAT_NAMES:
+        mod_applied = base.copy()
+        mod_applied[STAT_IDX[mod_target]] += STANDARD_MOD_VAL
+
+        # (A) No tuning
+        p_none = PieceType(label, tert, "none", None, None, mod_target)
+        piece_types.append(p_none)
+        piece_stats[p_none] = tuple(mod_applied)
+
+        # (B) +5/-5 tuning (if allowed)
+        if allow_tuned:
+            donor_candidates = [s for s in STAT_NAMES if mod_applied[STAT_IDX[s]] >= TUNING_VAL]
+            for tuned in STAT_NAMES:
+                for donor in donor_candidates:
+                    if donor == tuned:
+                        continue
+                    stats_after = mod_applied.copy()
+                    stats_after[STAT_IDX[donor]] -= TUNING_VAL
+                    stats_after[STAT_IDX[tuned]] += TUNING_VAL
+                    if any((v < 0 or v > MAX_PER_PIECE) for v in stats_after):
+                        continue
+                    p_tuned = PieceType(label, tert, "tuned", tuned, donor, mod_target)
+                    piece_types.append(p_tuned)
+                    piece_stats[p_tuned] = tuple(stats_after)
+
+        # (C) Balanced Tuning (+1 to three non-prim/sec/tert)
+        stats_bal = mod_applied.copy()
+        for idx in balanced_low_indices:
+            stats_bal[idx] += 1
+        p_bal = PieceType(label, tert, "balanced", None, None, mod_target)
+        piece_types.append(p_bal)
+        piece_stats[p_bal] = tuple(stats_bal)
+
+
+def _add_archetype_pieces(piece_types, piece_stats, arch, allow_tuned):
+    """Append every piece configuration for a single archetype to the accumulators.
+
+    Used for legendary armor, which has the 30 / 25 / 20 / 5 / 5 / 5 distribution and the full
+    set of tuning modes (none, +5/-5 tuned, balanced). Regular exotic armor shares this exact
+    profile post-update, so it is not generated separately — only the Exotic Class Item, whose
+    perk-determined roll is a genuine constraint, is modeled as a distinct exotic piece.
+    """
+    prim = arch.primary_stat
+    sec = arch.secondary_stat
+    tert_choices = [s for s in STAT_NAMES if s not in (prim, sec)]
+
+    for tert in tert_choices:
+        # Base BEFORE +10 and BEFORE tuning
+        base = [0] * 6
+        base[STAT_IDX[prim]] = PRIMARY_VAL
+        base[STAT_IDX[sec]] = SECONDARY_VAL
+        base[STAT_IDX[tert]] = TERTIARY_VAL
+        for s in STAT_NAMES:
+            if s not in (prim, sec, tert):
+                base[STAT_IDX[s]] = BASE_FIVE
+
+        # For Balanced Tuning, lowest three are non-prim/sec/tert
+        balanced_low_indices = [STAT_IDX[s] for s in STAT_NAMES if s not in (prim, sec, tert)]
+
+        _add_piece_variants(piece_types, piece_stats, arch.name, tert, base, balanced_low_indices, allow_tuned)
+
+
+def generate_piece_types(allow_tuned=True, *, use_class_item_exotic=False, exotic_perks=None):
     """Generate all armor piece configurations.
 
-    Normal armor:
+    Normal armor (always generated):
       - modes: none, tuned (if allow_tuned), balanced
-    Exotic (non-class-item):
-      - modes: none only (no tuning slot)
-      - exactly one may be used when solver is called with require_exotic=True
-      - stats: 30 / 20 / 13 / 5 / 5 / 5 (before +10)
-    Exotic Class Item:
-      - single fixed roll from CLASS_ITEM_ROLLS, modes: none only
-      - still has +10 mod slot
+      - stats: 30 / 25 / 20 / 5 / 5 / 5 (before +10)
+    Exotic Class Item (only when ``use_class_item_exotic``):
+      - stat roll is fixed by the perk pair (from CLASS_ITEM_ROLLS), but it supports the
+        full set of tuning modes (none, tuned, balanced) like any other piece, plus the
+        +10 mod slot
+
+    Regular exotic armor is intentionally not generated: post-update it shares the legendary
+    30/25/20 distribution and tuning set exactly, so a stat-identical legendary swap always
+    exists — requiring one could never change the achievable stat space.
     """
     piece_types = []
     piece_stats = {}
 
     # --- Normal piece generation (with Balanced Tuning) ---
     for arch in ARCHETYPES:
-        prim = arch.primary_stat
-        sec = arch.secondary_stat
-        tert_choices = [s for s in STAT_NAMES if s not in (prim, sec)]
+        _add_archetype_pieces(piece_types, piece_stats, arch, allow_tuned)
 
-        for tert in tert_choices:
-            # Base BEFORE +10 and BEFORE tuning
-            base = [0] * 6
-            base[STAT_IDX[prim]] = PRIMARY_VAL
-            base[STAT_IDX[sec]] = SECONDARY_VAL
-            base[STAT_IDX[tert]] = TERTIARY_VAL
-            for s in STAT_NAMES:
-                if s not in (prim, sec, tert):
-                    base[STAT_IDX[s]] = BASE_FIVE
-
-            # For Balanced Tuning, lowest three are non-prim/sec/tert
-            balanced_low_indices = [STAT_IDX[s] for s in STAT_NAMES if s not in (prim, sec, tert)]
-
-            for mod_target in STAT_NAMES:
-                mod_applied = base.copy()
-                mod_applied[STAT_IDX[mod_target]] += STANDARD_MOD_VAL
-
-                # (A) No tuning
-                p_none = PieceType(arch.name, tert, "none", None, None, mod_target)
-                piece_types.append(p_none)
-                piece_stats[p_none] = tuple(mod_applied)
-
-                # (B) +5/-5 tuning (if allowed)
-                if allow_tuned:
-                    donor_candidates = [s for s in STAT_NAMES if mod_applied[STAT_IDX[s]] >= TUNING_VAL]
-                    for tuned in STAT_NAMES:
-                        for donor in donor_candidates:
-                            if donor == tuned:
-                                continue
-                            stats_after = mod_applied.copy()
-                            stats_after[STAT_IDX[donor]] -= TUNING_VAL
-                            stats_after[STAT_IDX[tuned]] += TUNING_VAL
-                            if any((v < 0 or v > MAX_PER_PIECE) for v in stats_after):
-                                continue
-                            p_tuned = PieceType(arch.name, tert, "tuned", tuned, donor, mod_target)
-                            piece_types.append(p_tuned)
-                            piece_stats[p_tuned] = tuple(stats_after)
-
-                # (C) Balanced Tuning (+1 to three non-prim/sec/tert)
-                stats_bal = mod_applied.copy()
-                for idx in balanced_low_indices:
-                    stats_bal[idx] += 1
-                p_bal = PieceType(arch.name, tert, "balanced", None, None, mod_target)
-                piece_types.append(p_bal)
-                piece_stats[p_bal] = tuple(stats_bal)
-
-    # --- Exotic generation ---
-    if use_exotic:
-        if use_class_item_exotic:
-            if exotic_perks not in CLASS_ITEM_ROLLS:
-                raise ValueError("exotic_perks must be a (perk1, perk2) tuple present in CLASS_ITEM_ROLLS")
-            prim, sec, tert = CLASS_ITEM_ROLLS[exotic_perks]
-            base = [BASE_FIVE] * 6
-            base[STAT_IDX[prim]] = PRIMARY_VAL
-            base[STAT_IDX[sec]] = EXOTIC_SECONDARY_VAL
-            base[STAT_IDX[tert]] = EXOTIC_TERTIARY_VAL
-            for mod_target in STAT_NAMES:
-                mod_applied = base.copy()
-                mod_applied[STAT_IDX[mod_target]] += STANDARD_MOD_VAL
-                label = f"Exotic Class Item ({exotic_perks[0]} + {exotic_perks[1]})"
-                p_none = PieceType(label, tert, "none", None, None, mod_target)
-                piece_types.append(p_none)
-                piece_stats[p_none] = tuple(mod_applied)
-        else:
-            # Generate exotic alternatives for each archetype (no tuning for exotics)
-            for arch in ARCHETYPES:
-                prim = arch.primary_stat
-                sec = arch.secondary_stat
-                tert_choices = [s for s in STAT_NAMES if s not in (prim, sec)]
-                for tert in tert_choices:
-                    base = [BASE_FIVE] * 6
-                    base[STAT_IDX[prim]] = PRIMARY_VAL
-                    base[STAT_IDX[sec]] = EXOTIC_SECONDARY_VAL
-                    base[STAT_IDX[tert]] = EXOTIC_TERTIARY_VAL
-                    for mod_target in STAT_NAMES:
-                        mod_applied = base.copy()
-                        mod_applied[STAT_IDX[mod_target]] += STANDARD_MOD_VAL
-                        label = f"Exotic {arch.name}"
-                        p_none = PieceType(label, tert, "none", None, None, mod_target)
-                        piece_types.append(p_none)
-                        piece_stats[p_none] = tuple(mod_applied)
+    # --- Exotic Class Item generation ---
+    if use_class_item_exotic:
+        if exotic_perks not in CLASS_ITEM_ROLLS:
+            raise ValueError("exotic_perks must be a (perk1, perk2) tuple present in CLASS_ITEM_ROLLS")
+        prim, sec, tert = CLASS_ITEM_ROLLS[exotic_perks]
+        # Fixed stat roll from the perk pair, but with a full tuning slot like any piece.
+        base = [BASE_FIVE] * 6
+        base[STAT_IDX[prim]] = PRIMARY_VAL
+        base[STAT_IDX[sec]] = SECONDARY_VAL
+        base[STAT_IDX[tert]] = TERTIARY_VAL
+        balanced_low_indices = [STAT_IDX[s] for s in STAT_NAMES if s not in (prim, sec, tert)]
+        label = f"Exotic Class Item ({exotic_perks[0]} + {exotic_perks[1]})"
+        _add_piece_variants(piece_types, piece_stats, label, tert, base, balanced_low_indices, allow_tuned)
 
     return piece_types, piece_stats
 
@@ -202,7 +219,7 @@ def identical_piece_check(desired_totals, piece_types, piece_stats):
 # ----------------------------
 
 def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solutions=10, allow_tuned=True,
-                             require_exotic=False, total_timeout=120, minimum_constraints=None):
+                             require_class_item=False, total_timeout=120, minimum_constraints=None):
     if not HAS_PULP:
         raise RuntimeError("pulp not installed; can't run MILP")
 
@@ -211,8 +228,8 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
     solutions = []
     deviations = []
 
-    # Fast-path identical only when no exotic is required
-    if not require_exotic:
+    # Fast-path identical only when no exotic class item is required
+    if not require_class_item:
         ident = identical_piece_check(desired_totals, piece_types, piece_stats)
         if ident:
             solutions.append(ident)
@@ -238,11 +255,11 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
         # exactly 5 pieces
         prob += pulp.lpSum(x[p] for p in piece_types) == 5
 
-        # require exactly one exotic if requested
-        if require_exotic:
-            exotic_vars = [x[p] for p in piece_types if str(p.arch).lower().startswith("exotic ")]
-            if exotic_vars:
-                prob += pulp.lpSum(exotic_vars) == 1
+        # require exactly one exotic class item if requested
+        if require_class_item:
+            class_item_vars = [x[p] for p in piece_types if is_exotic_class_item(p.arch)]
+            if class_item_vars:
+                prob += pulp.lpSum(class_item_vars) == 1
             else:
                 return None, None
 
@@ -351,22 +368,21 @@ def format_solution(sol, deviation=0.0, desired_stats=None, piece_stats=None):
     # Group identical pieces by their string representation for display
     piece_groups = defaultdict(int)
     for p, count in sol.items():
+        # The Exotic Class Item's arch label already reads "Exotic Class Item (...)", so no
+        # extra prefix is needed to flag it.
         if p.tuning_mode == "balanced":
-            prefix = "[EXOTIC] " if str(p.arch).lower().startswith("exotic ") else ""
-            key = f"{prefix}{p.arch} (tertiary={p.tertiary}) Balanced Tuning (+1 to 3 lowest stats)"
+            key = f"{p.arch} (tertiary={p.tertiary}) Balanced Tuning (+1 to 3 lowest stats)"
         elif p.tuning_mode == "tuned":
-            prefix = "[EXOTIC] " if str(p.arch).lower().startswith("exotic ") else ""
-            key = f"{prefix}{p.arch} (tertiary={p.tertiary}) No specific tuning required"
+            key = f"{p.arch} (tertiary={p.tertiary}) No specific tuning required"
             # Track the tuning requirement separately
             tuning_requirements[p.tuned_stat] += count
             # This piece can be flexible for other tuning needs
             flexible_pieces += count
         else:
-            prefix = "[EXOTIC] " if str(p.arch).lower().startswith("exotic ") else ""
-            key = f"{prefix}{p.arch} (tertiary={p.tertiary}) No tuning required"
-            # Non-exotic, non-balanced pieces can accept any +5/-5 tuning
-            if not str(p.arch).lower().startswith("exotic "):
-                flexible_pieces += count
+            key = f"{p.arch} (tertiary={p.tertiary}) No tuning required"
+            # Every piece (including the Exotic Class Item) has an open tuning slot and
+            # can accept any +5/-5 tuning mod.
+            flexible_pieces += count
         piece_groups[key] += count
         mods[p.mod_target] += count
 
@@ -427,14 +443,12 @@ if __name__ == "__main__":
 
     # User-configurable options
     allow_tuned = True            # Toggle +5/-5 tuning
-    use_exotic = True             # Toggle using an exotic piece
-    use_class_item_exotic = True # Toggle using an exotic class item
+    use_class_item_exotic = True  # Toggle using an exotic class item
     exotic_perks = ("Spirit of Inmost Light", "Spirit of Cyrtarachne")           # Only used if use_class_item_exotic=True, e.g. ("Spirit of Inmost Light", "Spirit of Synthoceps")
 
     print(f"\n{'='*60}")
     print(f"Testing configuration:")
     print(f"allow_tuned = {allow_tuned}")
-    print(f"use_exotic = {use_exotic}")
     print(f"use_class_item_exotic = {use_class_item_exotic}")
     if use_class_item_exotic:
         print(f"exotic_perks = {exotic_perks}")
@@ -442,7 +456,6 @@ if __name__ == "__main__":
 
     piece_types, piece_stats = generate_piece_types(
         allow_tuned=allow_tuned,
-        use_exotic=use_exotic,
         use_class_item_exotic=use_class_item_exotic,
         exotic_perks=exotic_perks
     )
@@ -454,7 +467,7 @@ if __name__ == "__main__":
         piece_stats,
         max_solutions=10,
         allow_tuned=allow_tuned,
-        require_exotic=use_exotic,
+        require_class_item=use_class_item_exotic,
         total_timeout=30  # 30 second timeout for Phase 2 only
     )
     if not sols:

@@ -79,9 +79,10 @@ Note: cache files in `/tmp` and the in-memory rate-limiter state are ephemeral o
 - **Balanced Tuning**: +1 to three lowest stats
 
 ### Exotic Armor
-- Different stat distribution: 30/20/13/5/5/5
-- No tuning slots available
-- Exotic class items have fixed perk combinations
+- Stat distribution matches Tier 5 legendary: 30/25/20/5/5/5
+- Supports tuning mods like any other piece — including exotic class items, which can
+  take any tuning mod (no dedicated/random tuning roll)
+- Exotic class items have fixed perk combinations that determine their stat roll
 
 ## Key Dependencies
 

@@ -7,7 +7,13 @@ import time
 # Add the current directory to Python path so we can import our modules
 sys.path.append(os.path.dirname(__file__))
 
-from main import solve_with_milp_multiple, generate_piece_types, calculate_actual_stats, CLASS_ITEM_ROLLS
+from main import (
+    solve_with_milp_multiple,
+    generate_piece_types,
+    calculate_actual_stats,
+    CLASS_ITEM_ROLLS,
+    STAT_NAMES,
+)
 from cache import optimization_cache
 from rate_limiter import rate_limiter
 from config import OPTIMIZATION_TIMEOUT_SECONDS
@@ -46,23 +52,31 @@ class handler(BaseHTTPRequestHandler):
 
             # Extract parameters with defaults
             allow_tuned = request_data.get('allow_tuned', True)
-            use_exotic = request_data.get('use_exotic', False)
             use_class_item_exotic = request_data.get('use_class_item_exotic', False)
             exotic_perks = request_data.get('exotic_perks')
             minimum_constraints = request_data.get('minimum_constraints')
 
+            # Subclass fragments shift the player's baseline stats. The armor only needs to make
+            # up the difference, so we subtract the fragment bonus from every target before
+            # solving and fold it back into the reported stats afterward.
+            fragment_bonuses = request_data.get('fragment_bonuses') or {}
+
             desired_totals = [
-                request_data.get('Health', 0),
-                request_data.get('Melee', 0),
-                request_data.get('Grenade', 0),
-                request_data.get('Super', 0),
-                request_data.get('Class', 0),
-                request_data.get('Weapons', 0),
+                request_data.get(s, 0) - fragment_bonuses.get(s, 0)
+                for s in STAT_NAMES
             ]
+
+            # Shift any minimum constraints onto the same armor-only basis.
+            if minimum_constraints:
+                minimum_constraints = {
+                    s: (None if minimum_constraints.get(s) is None
+                        else minimum_constraints[s] - fragment_bonuses.get(s, 0))
+                    for s in STAT_NAMES
+                }
 
             # Validate exotic perk combination if using an exotic class item
             exotic_perks_tuple = None
-            if use_exotic and use_class_item_exotic:
+            if use_class_item_exotic:
                 if not exotic_perks or len(exotic_perks) != 2:
                     send_json(self, {
                         "error": "exotic_perks must be a list of exactly 2 perk names when using exotic class item",
@@ -80,7 +94,6 @@ class handler(BaseHTTPRequestHandler):
             # Generate piece types and solve
             piece_types, piece_stats = generate_piece_types(
                 allow_tuned=allow_tuned,
-                use_exotic=use_exotic,
                 use_class_item_exotic=use_class_item_exotic,
                 exotic_perks=exotic_perks_tuple,
             )
@@ -91,7 +104,7 @@ class handler(BaseHTTPRequestHandler):
                 piece_stats,
                 max_solutions=8,
                 allow_tuned=allow_tuned,
-                require_exotic=use_exotic,
+                require_class_item=use_class_item_exotic,
                 total_timeout=OPTIMIZATION_TIMEOUT_SECONDS,
                 minimum_constraints=minimum_constraints,
             )
@@ -103,7 +116,7 @@ class handler(BaseHTTPRequestHandler):
                 }
             else:
                 response = {
-                    "solutions": _format_solutions(solutions_list, deviations_list, piece_stats),
+                    "solutions": _format_solutions(solutions_list, deviations_list, piece_stats, fragment_bonuses),
                     "message": f"Found {len(solutions_list)} optimal solution(s)",
                     "compute_time_seconds": round(time.time() - start_time, 2),
                     "cached": False,
@@ -121,8 +134,15 @@ class handler(BaseHTTPRequestHandler):
         send_preflight(self, methods=METHODS)
 
 
-def _format_solutions(solutions_list, deviations_list, piece_stats):
-    """Convert solver output into the JSON shape the frontend expects."""
+def _format_solutions(solutions_list, deviations_list, piece_stats, fragment_bonuses=None):
+    """Convert solver output into the JSON shape the frontend expects.
+
+    ``fragment_bonuses`` (a {stat: delta} dict) is the baseline shift from subclass fragments.
+    It is added back into the reported ``actualStats`` so the frontend compares true totals
+    (armor + fragments) against the user's desired totals.
+    """
+    fragment_bonuses = fragment_bonuses or {}
+    bonus_vec = [fragment_bonuses.get(s, 0) for s in STAT_NAMES]
     formatted_solutions = []
     for sol, deviation in zip(solutions_list, deviations_list):
         pieces_dict = {}
@@ -148,14 +168,17 @@ def _format_solutions(solutions_list, deviations_list, piece_stats):
                     "siphon_from": piece_type.siphon_from,
                 })
                 flexible_pieces += count
-            elif piece_type.tuning_mode == "none" and not str(piece_type.arch).lower().startswith("exotic "):
-                # Non-exotic, non-balanced pieces can accept any +5/-5 tuning
+            elif piece_type.tuning_mode == "none":
+                # Every piece (including the Exotic Class Item) has an open tuning slot and
+                # can accept any +5/-5 tuning mod.
                 flexible_pieces += count
 
+        armor_stats = calculate_actual_stats(sol, piece_stats)
+        total_stats = [armor_stats[i] + bonus_vec[i] for i in range(6)]
         formatted_solutions.append({
             "pieces": pieces_dict,
             "deviation": float(deviation),
-            "actualStats": calculate_actual_stats(sol, piece_stats),
+            "actualStats": total_stats,
             "tuningRequirements": tuning_requirements,
             "flexiblePieces": flexible_pieces,
         })

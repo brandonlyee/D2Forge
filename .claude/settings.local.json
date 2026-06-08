@@ -3,7 +3,10 @@
     "allow": [
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({**d.get\\('dependencies',{}\\),**d.get\\('devDependencies',{}\\)},indent=2\\)\\)\")",
+      "WebFetch(domain:claude.ai)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
