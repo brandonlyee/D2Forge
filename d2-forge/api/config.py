@@ -8,6 +8,7 @@ RATE_LIMIT_MAX_REQUESTS = 4
 RATE_LIMIT_WINDOW_SECONDS = 60
 
 # Solver
+EXACT_TIMEOUT_SECONDS = 15  # Phase 1 (exact) timeout
 OPTIMIZATION_TIMEOUT_SECONDS = 15  # Phase 2 (approximate) timeout
 
 # Stats

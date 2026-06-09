@@ -1,1 +1,7 @@
-{}
+{
+  "functions": {
+    "api/optimize.py": {
+      "maxDuration": 45
+    }
+  }
+}

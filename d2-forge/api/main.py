@@ -219,7 +219,18 @@ def identical_piece_check(desired_totals, piece_types, piece_stats):
 # ----------------------------
 
 def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solutions=10, allow_tuned=True,
-                             require_class_item=False, total_timeout=120, minimum_constraints=None):
+                             require_class_item=False, total_timeout=120, minimum_constraints=None,
+                             exact_timeout=None):
+    """Find up to ``max_solutions`` armor builds for ``desired_totals``.
+
+    Two phases, each independently time-bounded so the solve can never run unbounded:
+      * Phase 1 (exact)       — bounded by ``exact_timeout`` (seconds; None = no limit).
+      * Phase 2 (approximate) — bounded by ``total_timeout``, only runs if Phase 1 found nothing.
+
+    ``exact_timeout`` defaults to None to preserve exhaustive behaviour for direct/standalone
+    callers; the production endpoint passes an explicit value so a hard target cannot grind
+    until the serverless function is killed.
+    """
     if not HAS_PULP:
         raise RuntimeError("pulp not installed; can't run MILP")
 
@@ -237,13 +248,10 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
 
     exclusions = []
 
-    def solve_problem(allow_deviation=False, use_timeout=False):
-        if use_timeout:
-            # Calculate remaining time for this solver call
-            elapsed = time.time() - start_time
-            remaining_time = max(10, total_timeout - elapsed)  # At least 10 seconds per call
-        else:
-            remaining_time = None  # No timeout for exact solutions
+    def solve_problem(allow_deviation=False, time_limit=None):
+        # ``time_limit`` is the wall-clock budget (seconds) for this single CBC call;
+        # None means no limit. Both phases pass an explicit budget in production so the
+        # solver can never run unbounded (see the Phase 1 / Phase 2 loops below).
         prob = pulp.LpProblem("DestinyArmor3", pulp.LpMinimize)
         x = {p: pulp.LpVariable(f"x_{i}", lowBound=0, upBound=5, cat="Integer")
              for i, p in enumerate(piece_types)}
@@ -293,10 +301,10 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
         for excl in exclusions:
             prob += pulp.lpSum(x[p] for p in excl) <= 4
 
-        if remaining_time is not None:
-            prob.solve(pulp.PULP_CBC_CMD(msg=True, timeLimit=remaining_time))
+        if time_limit is not None:
+            prob.solve(pulp.PULP_CBC_CMD(msg=False, timeLimit=max(1.0, time_limit)))
         else:
-            prob.solve(pulp.PULP_CBC_CMD(msg=True))  # No timeout
+            prob.solve(pulp.PULP_CBC_CMD(msg=False))  # No limit
         if pulp.LpStatus[prob.status] not in ["Optimal", "Not Solved"]:
             return None, None
 
@@ -307,9 +315,20 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
             dev_total = sum(0.2 * (dev_pos[s].value() or 0) + 5.0 * (dev_neg[s].value() or 0) for s in STAT_NAMES)
         return normalize_solution(sol), dev_total
 
-    # Phase 1: find exact solutions (no timeout)
+    # Phase 1: find exact solutions, bounded by ``exact_timeout`` (None = unbounded).
+    # Previously this phase had no time limit at all, so a target with no easily-found exact
+    # match (or one that is slow to prove infeasible) could grind until the platform killed
+    # the function. Each solve now gets the remaining exact budget as its CBC time limit,
+    # and the loop stops once that budget is spent.
+    exact_deadline = (start_time + exact_timeout) if exact_timeout is not None else None
     while len(solutions) < max_solutions:
-        sol, dev = solve_problem(allow_deviation=False)
+        if exact_deadline is not None:
+            remaining = exact_deadline - time.time()
+            if remaining <= 0:
+                break
+        else:
+            remaining = None
+        sol, dev = solve_problem(allow_deviation=False, time_limit=remaining)
         if not sol:
             break
         if sol not in solutions:
@@ -317,17 +336,15 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
             deviations.append(dev)
         exclusions.append(list(sol.keys()))
 
-    # Phase 2: approximations if needed (with timeout)
+    # Phase 2: approximations if no exact match was found, bounded by ``total_timeout``.
     if not solutions:
         exclusions = []
-        # Reset start time for Phase 2 timeout
-        start_time = time.time()
+        phase2_start = time.time()
         while len(solutions) < max_solutions:
-            # Check if we've exceeded total timeout
-            if time.time() - start_time >= total_timeout:
+            remaining = total_timeout - (time.time() - phase2_start)
+            if remaining <= 0:
                 break
-                
-            sol, dev = solve_problem(allow_deviation=True, use_timeout=True)
+            sol, dev = solve_problem(allow_deviation=True, time_limit=remaining)
             if not sol:
                 break
             if sol not in solutions:

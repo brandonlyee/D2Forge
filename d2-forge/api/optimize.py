@@ -16,7 +16,7 @@ from main import (
 )
 from cache import optimization_cache
 from rate_limiter import rate_limiter
-from config import OPTIMIZATION_TIMEOUT_SECONDS
+from config import EXACT_TIMEOUT_SECONDS, OPTIMIZATION_TIMEOUT_SECONDS
 from http_utils import send_json, send_preflight
 
 METHODS = 'POST, OPTIONS'
@@ -106,6 +106,7 @@ class handler(BaseHTTPRequestHandler):
                 allow_tuned=allow_tuned,
                 require_class_item=use_class_item_exotic,
                 total_timeout=OPTIMIZATION_TIMEOUT_SECONDS,
+                exact_timeout=EXACT_TIMEOUT_SECONDS,
                 minimum_constraints=minimum_constraints,
             )
 
