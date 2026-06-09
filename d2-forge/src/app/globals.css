@@ -83,6 +83,10 @@
   --under-soft:        oklch(0.55 0.21 22 / 12%);
   --track:             oklch(0.90 0.006 285);
   --shadow:            0 14px 34px -22px rgba(40,30,70,.28);
+  --grid-line:         oklch(0.45 0.02 285 / 6%);
+  --glow-opacity:      .5;
+  --panel-bg:          oklch(1 0 0 / 78%);
+  --panel-edge:        oklch(1 0 0 / 70%);
 
   /* radius scale */
   --r-sm: 2px;
@@ -123,6 +127,10 @@
   --under-soft:        oklch(0.66 0.20 18 / 16%);
   --track:             oklch(0.30 0.014 277);
   --shadow:            0 18px 40px -20px rgba(6,4,16,.7);
+  --grid-line:         oklch(1 0 0 / 3.5%);
+  --glow-opacity:      .6;
+  --panel-bg:          oklch(0.205 0.014 276 / 72%);
+  --panel-edge:        oklch(1 0 0 / 8%);
 }
 
 /* shared radius/type tokens */
@@ -141,6 +149,10 @@
     box-sizing: border-box;
   }
   html, body { margin: 0; padding: 0; }
+  /* Absolutely-positioned tooltip bodies (and any future stray overflow) must not
+     make the whole page horizontally scrollable. `clip` — not `hidden` — so it
+     never establishes a scroll container that would break the sticky topbar. */
+  html { overflow-x: clip; }
   body {
     background: var(--background);
     color: var(--foreground);
@@ -148,6 +160,23 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
+}
+/* ambient depth: faint violet/cyan glow + hairline grid, fixed behind everything */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(900px 520px at 16% -10%, color-mix(in oklab, var(--primary) 22%, transparent), transparent 60%),
+    radial-gradient(760px 460px at 102% -4%, color-mix(in oklab, var(--telemetry) 14%, transparent), transparent 55%);
+  opacity: var(--glow-opacity, .55);
+}
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: 46px 46px;
+  -webkit-mask-image: radial-gradient(circle at 50% -2%, #000, transparent 75%);
+          mask-image: radial-gradient(circle at 50% -2%, #000, transparent 75%);
 }
 ::selection { background: var(--primary-soft); }
 img { display: block; }
@@ -165,7 +194,7 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
 /* ============================================================================
    APP SHELL
    ========================================================================== */
-.app-shell { min-height: 100vh; }
+.app-shell { position: relative; z-index: 1; min-height: 100vh; }
 .topbar {
   position: sticky; top: 0; z-index: 40;
   display: flex; align-items: center; justify-content: space-between;
@@ -221,7 +250,9 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
 .page-head p { margin: 8px 0 0; color: var(--muted-foreground); font-size: 14px; max-width: 720px; line-height: 1.55; }
 
 .layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 20px; align-items: start; }
-@media (max-width: 1040px) { .layout { grid-template-columns: 1fr; } }
+/* minmax(0, 1fr) — not a bare 1fr — so the single column can shrink to the
+   viewport instead of blowing out to its content's min-content width. */
+@media (max-width: 1040px) { .layout { grid-template-columns: minmax(0, 1fr); } }
 
 /* On wide layouts, bound the form + solutions to the viewport height so each
    pane scrolls independently and the page itself never scrolls past the
@@ -242,10 +273,18 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
    ========================================================================== */
 .panel {
   position: relative;
-  background: var(--card);
+  background: var(--panel-bg, var(--card));
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow);
+}
+/* lit top edge — a hairline highlight that catches the ambient light */
+.panel::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--panel-edge), transparent);
+  border-radius: var(--r-lg) var(--r-lg) 0 0; pointer-events: none;
 }
 .panel + .panel { margin-top: 16px; }
 .panel-head {
@@ -347,7 +386,7 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
 .totalbar.over { border-color: color-mix(in oklab, var(--warning) 50%, transparent); background: var(--warning-soft); }
 .totalbar .l { display: flex; align-items: center; gap: 12px; }
 .totalbar .l .cap { font-family: var(--font-num); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted-foreground); }
-.totalbar .l .val { font-family: var(--font-num); font-weight: 700; font-size: 20px; color: var(--primary); letter-spacing: .01em; line-height: 1; }
+.totalbar .l .val { font-family: var(--font-num); font-weight: 700; font-size: 20px; color: var(--primary); letter-spacing: .01em; line-height: 1; text-shadow: 0 0 18px color-mix(in oklab, var(--primary) 45%, transparent); }
 .totalbar.over .l .val { color: var(--warning); }
 .totalbar .r { font-family: var(--font-num); font-size: 11px; color: var(--muted-foreground); display: flex; align-items: center; gap: 6px; }
 .meter { width: 96px; height: 4px; background: var(--track); border-radius: 999px; overflow: hidden; }
@@ -451,6 +490,7 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
 .sol-rank {
   font-family: var(--font-num); font-weight: 700; font-size: 12px; color: var(--primary-foreground);
   background: var(--primary); border-radius: var(--r-sm); padding: 5px 8px; letter-spacing: .04em;
+  box-shadow: 0 0 16px -2px color-mix(in oklab, var(--primary) 60%, transparent);
 }
 .sol-title { font-family: var(--font-display-stack); font-weight: 600; font-size: 15px; letter-spacing: .03em; text-transform: uppercase; color: var(--foreground); }
 
@@ -533,12 +573,17 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
 .tip .tip-ic { width: 13px; height: 13px; color: var(--muted-foreground); cursor: help; }
 .tip .tip-body {
   position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(4px);
-  width: 220px; background: var(--card); color: var(--foreground); border: 1px solid var(--border-strong);
+  width: 220px; max-width: calc(100vw - 20px);
+  background: var(--card); color: var(--foreground); border: 1px solid var(--border-strong);
   border-radius: var(--r-xl); padding: 9px 11px; font-family: var(--font-ui); font-size: 11.5px; line-height: 1.45;
   text-transform: none; letter-spacing: normal; white-space: normal; text-align: left;
   box-shadow: 0 14px 30px -10px rgba(0,0,0,.5); opacity: 0; pointer-events: none; transition: opacity .14s, transform .14s; z-index: 60;
 }
 .tip:hover .tip-body, .tip:focus-within .tip-body { opacity: 1; transform: translateX(-50%) translateY(0); }
+/* Right-edge triggers (e.g. the total bar's MAX tooltip) would push a centered
+   tooltip off-screen — anchor those to the trigger's right edge instead. */
+.totalbar .r .tip .tip-body { left: auto; right: 0; transform: translateX(0) translateY(4px); }
+.totalbar .r .tip:hover .tip-body, .totalbar .r .tip:focus-within .tip-body { transform: translateX(0) translateY(0); }
 
 /* theme toggle */
 .theme-toggle { appearance: none; -webkit-appearance: none; width: 36px; height: 36px; border-radius: var(--r); border: 1px solid var(--border-strong); background: transparent; color: var(--foreground); display: grid; place-items: center; cursor: pointer; transition: background .13s; }
@@ -708,4 +753,28 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
 .frag-line {
   display: flex; align-items: center; gap: 10px; padding: 8px 10px;
   border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface);
+}
+
+/* ============================================================================
+   MOBILE REFINEMENTS
+   ========================================================================== */
+/* The decorative "● Checklists" status pill is non-essential and otherwise
+   pushes the topbar's action buttons (incl. the theme toggle) off-screen on
+   narrow viewports. Hide it alongside the banner subtitle. */
+@media (max-width: 720px) {
+  .brand .live { display: none; }
+}
+
+/* On small phones the desktop paddings (24px gutters, 18px panel body) eat too
+   much of the line length and can force horizontal overflow. Tighten them so
+   content fits within the viewport. */
+@media (max-width: 480px) {
+  .topbar { padding: 0 14px; gap: 10px; }
+  .topbar-actions { gap: 6px; }
+  .container-forge { padding: 16px 14px 48px; }
+  .panel-body { padding: 14px; }
+  .panel-head, .sol-head, .ck-head, .ck-progress, .ck-body { padding-left: 14px; padding-right: 14px; }
+  .page-head h1 { font-size: 24px; }
+  /* Narrower so a centered tooltip on a center-right trigger still fits the viewport. */
+  .tip .tip-body { width: 200px; }
 }
