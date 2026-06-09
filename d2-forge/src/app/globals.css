@@ -232,7 +232,10 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
   font-family: var(--font-num); font-size: 11px; letter-spacing: .08em;
   text-transform: uppercase; color: var(--muted-foreground); white-space: nowrap;
 }
-@media (max-width: 720px) { .brand .banner-sub { display: none; } }
+/* Hide the wordmark subtitle until there's room for it beside the full-text
+   action buttons. Between ~721–819px it would otherwise push the theme toggle
+   off-screen; it only fits comfortably from ~820px up. */
+@media (max-width: 859px) { .brand .banner-sub { display: none; } }
 .banner-tip .tip-ic { width: 14px; height: 14px; }
 .brand .banner-tip .tip-body { top: calc(100% + 8px); bottom: auto; left: 50%; transform: translateX(-50%) translateY(-4px); }
 .brand .banner-tip:hover .tip-body, .brand .banner-tip:focus-within .tip-body { transform: translateX(-50%) translateY(0); }
@@ -668,7 +671,8 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
 .ck-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; flex: 0 0 auto; }
 .ck-piece-top + .ck-controls { margin-left: auto; }
 .ck-ctl-group { display: flex; align-items: center; gap: 9px; }
-.ck-ctl-group .gl { font-family: var(--font-num); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-foreground); }
+.ck-ctl-group .gl { font-family: var(--font-num); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-foreground); white-space: nowrap; }
+.tuning-field { width: 150px; }
 
 /* slot buttons */
 .slot-btns { display: flex; gap: 6px; }
@@ -788,4 +792,17 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
      header wrap so the sub drops to its own line and wraps. */
   .panel-head { flex-wrap: wrap; row-gap: 4px; }
   .panel-head .sub { flex-basis: 100%; margin-left: 0; white-space: normal; }
+
+  /* Checklist piece controls (Slot buttons + Tuning select) don't fit beside the
+     piece info on a phone. Drop them to their own full-width line and stack each
+     group label-over-control; slot buttons flex to share the row evenly. */
+  .ck-controls { flex-basis: 100%; flex-direction: column; align-items: stretch; gap: 12px; margin-left: 0; }
+  .ck-ctl-group { flex-direction: column; align-items: stretch; gap: 6px; }
+  .slot-btns { width: 100%; }
+  .slot-btn { flex: 1 1 0; width: auto; min-width: 0; max-width: 52px; }
+  .tuning-field { width: 100%; }
+
+  /* Tighten the 5-column stat table's cell padding so it fits the narrowest
+     phones (it overflowed ~8px at 320px with the default 10px gutters). */
+  .stat-table th, .stat-table td { padding-left: 6px; padding-right: 6px; }
 }

@@ -20,7 +20,7 @@ export function TuningDropdown({ item, onTuningSelect }: TuningDropdownProps) {
   ]
 
   return (
-    <div style={{ width: 150 }}>
+    <div className="tuning-field">
       <ForgeSelect
         value={item.selectedTuning || 'none'}
         placeholder="Select"
