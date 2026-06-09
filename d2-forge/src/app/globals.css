@@ -450,7 +450,12 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
 /* ============================================================================
    SELECT (custom dropdown)
    ========================================================================== */
-.select { position: relative; }
+.select { position: relative; min-width: 0; }
+/* Exotic perk pickers — two columns that can shrink (minmax(0,…) so a long perk
+   name like "Spirit of Osmiomancy" truncates instead of blowing the grid out
+   past the panel), collapsing to one column on small phones for full names. */
+.perk-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 480px) { .perk-grid { grid-template-columns: 1fr; } }
 .select-trigger {
   appearance: none; -webkit-appearance: none;
   width: 100%; display: flex; align-items: center; gap: 8px; justify-content: space-between;

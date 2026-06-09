@@ -430,7 +430,7 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
                   <div className="opt-desc" style={{ marginBottom: 12 }}>
                     Pick two perks. Only certain combinations are valid.
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div className="perk-grid">
                     <div>
                       <div className="subhead" style={{ margin: "0 0 8px" }}>
                         First Perk
