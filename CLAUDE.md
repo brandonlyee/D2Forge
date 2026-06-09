@@ -30,9 +30,10 @@ npm run lint         # Run ESLint for code quality
 
 ### Frontend Architecture (`src/`)
 - **Main Page**: `src/app/page.tsx` - Handles stat input form and solution display
-- **Form Component**: `src/components/stat-input-form.tsx` - Complex form with Zod validation, stat sliders, exotic perk selection
+- **Form Component**: `src/components/stat-input-form.tsx` - Complex form with Zod validation, stat sliders, exotic perk selection, and subclass-fragment selection
 - **Solution Display**: `src/components/solution-display.tsx` - Shows optimization results
-- **UI Components**: `src/components/ui/` - Radix-based shadcn/ui components
+- **Subclass Fragments**: `src/lib/fragments.ts` (data model + baseline-stat math) and `src/components/fragment-list.tsx` (picker)
+- **UI Components**: `src/components/ui/` - Radix-based shadcn/ui components; the custom "Forge Console" primitives live in `src/components/forge/`
 - **Theme System**: Uses next-themes with dark/light mode support
 
 ### Backend Architecture (`api/`)
@@ -66,23 +67,41 @@ Note: cache files in `/tmp` and the in-memory rate-limiter state are ephemeral o
 - Max per piece: 45 (30 primary + 10 mod + 5 tuning)
 
 ### Armor Archetypes
-- **Brawler**: Melee (30) + Health (25) 
+Each piece's archetype fixes its primary (30) and secondary (25) stats. There are 12,
+defined in `ARCHETYPES` in `api/main.py` (the source of truth):
+- **Brawler**: Melee (30) + Health (25)
 - **Bulwark**: Health (30) + Class (25)
-- **Grenadier**: Grenade (30) + Weapons (25)
+- **Grenadier**: Grenade (30) + Super (25)
 - **Paragon**: Super (30) + Melee (25)
 - **Gunner**: Weapons (30) + Grenade (25)
 - **Specialist**: Class (30) + Weapons (25)
+- **Siegebreaker**: Health (30) + Grenade (25)
+- **Skirmisher**: Melee (30) + Weapons (25)
+- **Demolitionist**: Grenade (30) + Class (25)
+- **Colossus**: Super (30) + Health (25)
+- **Reaver**: Class (30) + Melee (25)
+- **Powerhouse**: Weapons (30) + Super (25)
 
 ### Modification System
 - **Standard Mod**: +10 to any stat
 - **Tuning Mod**: Transfer 5 points between stats
 - **Balanced Tuning**: +1 to three lowest stats
 
+### Subclass Fragments
+- Fragments shift a player's **baseline** stats by a fixed amount (+10 / -10 / -20 to one
+  or two stats); data lives in `src/lib/fragments.ts` (all 6 subclasses).
+- Only one subclass's fragments may be equipped at a time; there is no fixed count limit.
+- The solver subtracts the fragment baseline from the desired/minimum targets before
+  solving, then folds it back into reported stats so totals compare like-for-like.
+- Because fragments can net positive, they raise the achievable MAX above the armor-only
+  515 (the form's max meter is dynamic).
+
 ### Exotic Armor
-- Stat distribution matches Tier 5 legendary: 30/25/20/5/5/5
-- Supports tuning mods like any other piece — including exotic class items, which can
-  take any tuning mod (no dedicated/random tuning roll)
+- Regular exotic armor shares the legendary 30/25/20/5/5/5 roll and the full tuning set,
+  so a stat-identical legendary always exists — the optimizer therefore does not offer a
+  "require a regular exotic" option; only the **exotic class item** is user-selectable.
 - Exotic class items have fixed perk combinations that determine their stat roll
+  (`api/exotic_class_items.py`), and can take any tuning mod (no dedicated/random roll).
 
 ## Key Dependencies
 
@@ -102,8 +121,9 @@ Note: cache files in `/tmp` and the in-memory rate-limiter state are ephemeral o
 
 ### Form Validation
 The StatInputForm component includes complex validation for:
-- Stat totals (0-225 per stat, max 515 total)
+- Stat totals (0-225 per stat, max 515 total before fragment shifts)
 - Exotic perk combinations (specific valid pairs)
+- Subclass-fragment selection (single subclass at a time)
 - Minimum constraint locks
 
 ### Optimization Logic
@@ -114,9 +134,10 @@ The solver in `main.py` uses a two-phase approach:
 ### API Integration
 Frontend communicates with Vercel Functions at `/api/optimize` endpoint, passing:
 - Desired stat distribution
-- Optimization preferences (tuning, exotic options)
+- Optimization preferences (tuning, exotic class item toggle)
 - Minimum constraints
 - Exotic perk selections
+- Selected subclass and fragments
 
 ### Styling System
 Uses Tailwind with CSS variables for theming. Dark mode supported via next-themes.

@@ -8,14 +8,20 @@ D2 Forge is a Destiny 2 Edge of Fate Armor 3.0 Build Optimizer, that takes in a 
 * 5 armor pieces: Helmet, Arms, Chestpiece, Leggings, Class Item
 * 6 character stats: Health, Melee, Grenade, Super, Class, Weapons
 * Total stat pool: 500 points (100 per armor piece)
-## Armor Archetypes (6 types)
+## Armor Archetypes (12 types)
 Each piece must be one of these archetypes, which determines primary and secondary stats:
 * Brawler: Melee (30) primary, Health (25) secondary
 * Bulwark: Health (30) primary, Class (25) secondary
-* Grenadier: Grenade (30) primary, Weapons (25) secondary
+* Grenadier: Grenade (30) primary, Super (25) secondary
 * Paragon: Super (30) primary, Melee (25) secondary
 * Gunner: Weapons (30) primary, Grenade (25) secondary
 * Specialist: Class (30) primary, Weapons (25) secondary
+* Siegebreaker: Health (30) primary, Grenade (25) secondary
+* Skirmisher: Melee (30) primary, Weapons (25) secondary
+* Demolitionist: Grenade (30) primary, Class (25) secondary
+* Colossus: Super (30) primary, Health (25) secondary
+* Reaver: Class (30) primary, Melee (25) secondary
+* Powerhouse: Weapons (30) primary, Super (25) secondary
 ## Stat Distribution per Piece (Base)
 * Primary stat: 30 points (determined by archetype)
 * Secondary stat: 25 points (determined by archetype)
@@ -33,6 +39,14 @@ Each armor piece has 2 mod slots:
    * Can only siphon from the three base stats (those with 5 points) 
    * We can choose to NOT use the tuning mod if desired. This is usually preferred, as tuning slots add another layer of RNG when farming for specific armor pieces.
 
+
+## Exotic Armor
+* Regular exotic armor uses the same 30/25/20/5/5/5 roll as legendary armor and supports the full tuning set, so a stat-identical legendary piece always exists. Requiring a regular exotic could never change the achievable stat space, so the optimizer does not expose that option.
+* The **exotic class item** is the one exception: its stat roll is fixed by its pair of perks (the left perk sets the archetype / primary + secondary, the right perk grants the tertiary), so it is a genuine constraint you can opt into. It can also take any tuning mod. See the perk → stat table in `api/exotic_class_items.py`.
+
+## Subclass Fragments
+* Fragments shift your **baseline** stats by a fixed amount (+10 / -10 / -20 to one or two stats) in addition to their buildcrafting effects.
+* You select a subclass and its fragments in the form; only one subclass can be equipped at a time. The optimizer accounts for the net baseline shift when solving, and the achievable maximum total adjusts accordingly (it can exceed the armor-only 515 when fragments net positive).
 
 ## Key Constraints
 * Maximum per stat per piece: 45 (30 primary + 10 mod + 5 tuning)
@@ -106,9 +120,10 @@ i.e., each armor piece will have the following stats:
 
 ## Key Features
 - **Exact optimization** using MILP algorithms
-- **Exotic class item support** with conditional perk selection  
+- **Exotic class item support** with perk-pair stat rolls and tuning
+- **Subclass fragments** as a baseline-stat module
 - **Minimum stat constraints** with lock toggles
 - **Balanced tuning** support (+1 to three lowest stats)
 - **Difficulty scoring** (tuned vs non-tuned pieces)
-- **30-second timeout** for complex optimizations
+- **15-second timeout** for the approximate phase of complex optimizations
 - **Approximate solutions** when exact matches impossible
