@@ -102,7 +102,7 @@ class handler(BaseHTTPRequestHandler):
                 desired_totals,
                 piece_types,
                 piece_stats,
-                max_solutions=8,
+                max_solutions=5,
                 allow_tuned=allow_tuned,
                 require_class_item=use_class_item_exotic,
                 total_timeout=OPTIMIZATION_TIMEOUT_SECONDS,
