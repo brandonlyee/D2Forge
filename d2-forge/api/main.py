@@ -48,7 +48,9 @@ PieceType = namedtuple(
         "tuned_stat",  # if tuned: which stat receives +5
         "siphon_from",  # if tuned: which stat gives -5
         "mod_target",  # +10 standard mod target (kept for MILP math only)
+        "slot",  # None for solver-chosen pieces; "armor"/"class" for user-locked pieces
     ],
+    defaults=(None,),  # ``slot`` defaults to None so existing 6-arg construction still works
 )
 
 # Fixed rolls for Exotic Class Item (subset)
@@ -183,6 +185,140 @@ def generate_piece_types(allow_tuned=True, *, use_class_item_exotic=False, exoti
 
 
 # ----------------------------
+# User-locked pieces ("build around these")
+# ----------------------------
+
+ARCHETYPE_BY_NAME = {a.name: a for a in ARCHETYPES}
+
+
+def _locked_piece_variants(spec):
+    """Build every solver variant for a single user-locked piece.
+
+    A locked piece is one the player already owns and wants every build to include. Its
+    archetype + tertiary (the farmed roll) and its tuning *intent* are fixed by the user; the
+    +10 mod target — and, for a specific +5 tuning, the −5 donor — are still chosen by the
+    optimizer. We therefore emit one variant per (mod_target [, siphon]) combination consistent
+    with the spec, all tagged with ``slot`` so they stay distinct from solver-chosen pieces and
+    can be surfaced as "owned" downstream.
+
+    ``spec`` keys:
+      arch          archetype name (must be in ARCHETYPES)
+      tertiary      tertiary stat name (must differ from the archetype's primary/secondary)
+      is_class_item True -> occupies the class slot (slot="class"); else slot="armor"
+      tuning_mode   "none" | "balanced" | "tuned" | "flexible"
+      tuned_stat    target stat for the +5 (required when tuning_mode == "tuned")
+
+    Unlike normal/exotic pieces, locked tuning is honoured regardless of the global
+    ``allow_tuned`` toggle — the user explicitly curated these pieces.
+
+    Returns a list of (PieceType, stats_tuple). Raises ValueError on an invalid spec.
+    """
+    arch_name = spec.get("arch")
+    arch = ARCHETYPE_BY_NAME.get(arch_name)
+    if arch is None:
+        raise ValueError(f"Unknown locked-piece archetype: {arch_name!r}")
+    prim, sec = arch.primary_stat, arch.secondary_stat
+
+    tert = spec.get("tertiary")
+    if tert not in STAT_NAMES or tert in (prim, sec):
+        raise ValueError(
+            f"Invalid tertiary {tert!r} for {arch_name}: must be a stat other than {prim}/{sec}"
+        )
+
+    tuning_mode = spec.get("tuning_mode", "none")
+    if tuning_mode not in ("none", "balanced", "tuned", "flexible"):
+        raise ValueError(f"Invalid locked-piece tuning_mode: {tuning_mode!r}")
+    tuned_stat = spec.get("tuned_stat")
+    if tuning_mode == "tuned":
+        if tuned_stat not in STAT_NAMES:
+            raise ValueError(f"tuning_mode 'tuned' requires a valid tuned_stat, got {tuned_stat!r}")
+
+    slot = "class" if spec.get("is_class_item") else "armor"
+
+    base = [BASE_FIVE] * 6
+    base[STAT_IDX[prim]] = PRIMARY_VAL
+    base[STAT_IDX[sec]] = SECONDARY_VAL
+    base[STAT_IDX[tert]] = TERTIARY_VAL
+    balanced_low_indices = [STAT_IDX[s] for s in STAT_NAMES if s not in (prim, sec, tert)]
+
+    variants = []
+    for mod_target in STAT_NAMES:
+        mod_applied = base.copy()
+        mod_applied[STAT_IDX[mod_target]] += STANDARD_MOD_VAL
+
+        def add(tmode, t_stat, donor, stats):
+            p = PieceType(arch_name, tert, tmode, t_stat, donor, mod_target, slot)
+            variants.append((p, tuple(stats)))
+
+        if tuning_mode in ("none", "flexible"):
+            add("none", None, None, mod_applied)
+
+        if tuning_mode == "balanced":
+            stats_bal = mod_applied.copy()
+            for idx in balanced_low_indices:
+                stats_bal[idx] += 1
+            add("balanced", None, None, stats_bal)
+
+        if tuning_mode in ("tuned", "flexible"):
+            # Fixed +5 target ("tuned") or every +5 target ("flexible"); optimizer picks the donor.
+            target_stats = [tuned_stat] if tuning_mode == "tuned" else list(STAT_NAMES)
+            donor_candidates = [s for s in STAT_NAMES if mod_applied[STAT_IDX[s]] >= TUNING_VAL]
+            for t_stat in target_stats:
+                for donor in donor_candidates:
+                    if donor == t_stat:
+                        continue
+                    stats_after = mod_applied.copy()
+                    stats_after[STAT_IDX[donor]] -= TUNING_VAL
+                    stats_after[STAT_IDX[t_stat]] += TUNING_VAL
+                    if any((v < 0 or v > MAX_PER_PIECE) for v in stats_after):
+                        continue
+                    add("tuned", t_stat, donor, stats_after)
+
+    return variants
+
+
+def add_locked_pieces(piece_types, piece_stats, locked_pieces):
+    """Register user-locked pieces into the solver pools and return their constraint groups.
+
+    ``locked_pieces`` is a list of spec dicts (see ``_locked_piece_variants``). Identical specs
+    are merged so the solver requires the right *count* of that piece. Returns a list of
+    ``(variant_piece_types, required_count)`` tuples; the caller adds one equality constraint per
+    group (sum of the group's variables == required_count) so every build contains exactly the
+    locked pieces. Mutates ``piece_types``/``piece_stats`` in place.
+    """
+    if not locked_pieces:
+        return []
+
+    # Merge identical specs into (canonical_key -> [spec, count]).
+    merged = {}
+    order = []
+    for spec in locked_pieces:
+        key = (
+            spec.get("arch"),
+            spec.get("tertiary"),
+            bool(spec.get("is_class_item")),
+            spec.get("tuning_mode", "none"),
+            spec.get("tuned_stat"),
+        )
+        if key not in merged:
+            merged[key] = [spec, 0]
+            order.append(key)
+        merged[key][1] += 1
+
+    groups = []
+    for key in order:
+        spec, count = merged[key]
+        variants = _locked_piece_variants(spec)
+        group_vars = []
+        for p, stats in variants:
+            piece_types.append(p)
+            piece_stats[p] = stats
+            group_vars.append(p)
+        groups.append((group_vars, count))
+    return groups
+
+
+# ----------------------------
 # Helpers
 # ----------------------------
 
@@ -200,8 +336,10 @@ def difficulty_score(sol):
     Non-tuned pieces require: right archetype (1/6) + right tertiary (1/4) = 1/24 chance
     So tuned pieces are ~6x harder to farm than distinct piece types.
     """
-    distinct_types = len(sol)
-    tuning_count = sum(1 for p in sol if p.tuning_mode == "tuned")
+    # User-locked pieces (slot set) are already owned, so they carry no farming cost and are
+    # excluded from both the distinct-type and tuned-piece penalties.
+    distinct_types = sum(1 for p in sol if getattr(p, "slot", None) is None)
+    tuning_count = sum(1 for p in sol if p.tuning_mode == "tuned" and getattr(p, "slot", None) is None)
     return distinct_types * 10 + tuning_count * 60  # 60 points per tuned piece vs 10 per distinct type
 
 
@@ -220,7 +358,7 @@ def identical_piece_check(desired_totals, piece_types, piece_stats):
 
 def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solutions=10, allow_tuned=True,
                              require_class_item=False, total_timeout=120, minimum_constraints=None,
-                             exact_timeout=None):
+                             exact_timeout=None, locked_groups=None):
     """Find up to ``max_solutions`` armor builds for ``desired_totals``.
 
     Two phases, each independently time-bounded so the solve can never run unbounded:
@@ -239,8 +377,9 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
     solutions = []
     deviations = []
 
-    # Fast-path identical only when no exotic class item is required
-    if not require_class_item:
+    # Fast-path identical only when no exotic class item and no locked pieces are required
+    # (both force specific pieces into the build, so "5 of one type" can't apply).
+    if not require_class_item and not locked_groups:
         ident = identical_piece_check(desired_totals, piece_types, piece_stats)
         if ident:
             solutions.append(ident)
@@ -270,6 +409,12 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
                 prob += pulp.lpSum(class_item_vars) == 1
             else:
                 return None, None
+
+        # require user-locked pieces: each group must contribute exactly its requested count,
+        # so every build is "built around" the owned pieces and fills the rest optimally.
+        if locked_groups:
+            for group_vars, count in locked_groups:
+                prob += pulp.lpSum(x[p] for p in group_vars) == count
 
         # stat matching
         for si, s in enumerate(STAT_NAMES):

@@ -7,6 +7,8 @@ export interface PieceType {
   mod_target: string
   tuned_stat?: string | null
   siphon_from?: string | null
+  // null for solver-chosen pieces; "armor" | "class" for user-locked (owned) pieces.
+  slot?: string | null
 }
 
 export interface Solution {

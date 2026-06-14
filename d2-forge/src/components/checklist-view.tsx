@@ -230,8 +230,13 @@ export function ChecklistView({ checklist, onUpdate, onDelete }: ChecklistViewPr
                 <div style={{ minWidth: 0 }}>
                   <div className="ck-pname">
                     {item.archetype}
-                    {item.isExotic ? '' : ' Armor'}
+                    {item.isExotic ? '' : item.isClassItem ? ' Class Item' : ' Armor'}
                     {item.isExotic && <span className="tag exotic">Exotic</span>}
+                    {item.isLocked && (
+                      <span className="tag owned">
+                        <Icon.lock2 style={{ width: 11, height: 11 }} /> Owned
+                      </span>
+                    )}
                   </div>
                   <div className="ck-ptert">
                     Tertiary: <StatIcon stat={item.tertiary} size={13} /> {item.tertiary} · {pieceTuningLabel(item)}

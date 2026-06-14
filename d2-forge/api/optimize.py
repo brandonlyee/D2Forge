@@ -10,6 +10,7 @@ sys.path.append(os.path.dirname(__file__))
 from main import (
     solve_with_milp_multiple,
     generate_piece_types,
+    add_locked_pieces,
     calculate_actual_stats,
     CLASS_ITEM_ROLLS,
     STAT_NAMES,
@@ -74,6 +75,30 @@ class handler(BaseHTTPRequestHandler):
                     for s in STAT_NAMES
                 }
 
+            # User-locked pieces ("build around these"). Up to 4 owned pieces every build must
+            # include; the solver fills the remaining slots optimally. This composes with the
+            # exotic class item feature — the only conflict is the class slot, since an exotic
+            # class item and a locked class item both want it.
+            locked_pieces = request_data.get('locked_pieces') or []
+            if locked_pieces:
+                if len(locked_pieces) > 4:
+                    send_json(self, {
+                        "error": "At most 4 locked pieces are allowed.",
+                    }, status=400, methods=METHODS)
+                    return
+                class_item_locks = sum(1 for p in locked_pieces if p.get('is_class_item'))
+                if class_item_locks > 1:
+                    send_json(self, {
+                        "error": "Only one locked class item is allowed.",
+                    }, status=400, methods=METHODS)
+                    return
+                if class_item_locks and use_class_item_exotic:
+                    send_json(self, {
+                        "error": "A locked class item conflicts with the exotic class item; "
+                                 "both occupy the class slot. Disable one.",
+                    }, status=400, methods=METHODS)
+                    return
+
             # Validate exotic perk combination if using an exotic class item
             exotic_perks_tuple = None
             if use_class_item_exotic:
@@ -98,6 +123,13 @@ class handler(BaseHTTPRequestHandler):
                 exotic_perks=exotic_perks_tuple,
             )
 
+            # Register locked pieces (their specs are validated here via ValueError -> 400).
+            try:
+                locked_groups = add_locked_pieces(piece_types, piece_stats, locked_pieces)
+            except ValueError as e:
+                send_json(self, {"error": f"Invalid locked piece: {str(e)}"}, status=400, methods=METHODS)
+                return
+
             solutions_list, deviations_list = solve_with_milp_multiple(
                 desired_totals,
                 piece_types,
@@ -108,6 +140,7 @@ class handler(BaseHTTPRequestHandler):
                 total_timeout=OPTIMIZATION_TIMEOUT_SECONDS,
                 exact_timeout=EXACT_TIMEOUT_SECONDS,
                 minimum_constraints=minimum_constraints,
+                locked_groups=locked_groups,
             )
 
             if not solutions_list:
@@ -159,6 +192,8 @@ def _format_solutions(solutions_list, deviations_list, piece_stats, fragment_bon
                 'mod_target': piece_type.mod_target,
                 'tuned_stat': piece_type.tuned_stat,
                 'siphon_from': piece_type.siphon_from,
+                # None for solver-chosen pieces; "armor"/"class" for user-locked (owned) pieces.
+                'slot': piece_type.slot,
             }
             pieces_dict[json.dumps(piece_dict)] = count
 

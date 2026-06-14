@@ -17,6 +17,15 @@ import {
 import { STAT_NAMES, MAX_POSSIBLE_TOTAL, STORAGE_KEYS } from '@/lib/constants'
 import { readJSON, writeJSON } from '@/lib/storage'
 import { SUBCLASSES, SUBCLASS_BY_ID, computeFragmentBonuses } from '@/lib/fragments'
+import {
+  ARCHETYPES,
+  tertiaryOptions,
+  isLockedPieceValid,
+  type LockedPiece,
+  type LockedTuningMode,
+} from '@/lib/archetypes'
+
+const MAX_LOCKED_PIECES = 4
 
 // Map each Perk 1 (left, archetype) to its valid Perk 2 (right, tertiary) options.
 // Mirrors api/exotic_class_items.py CLASS_ITEM_ROLLS: class-agnostic left perks pair
@@ -119,6 +128,17 @@ const formSchema = z.object({
   use_fragments: z.boolean(),
   fragment_subclass: z.string().optional(),
   fragments: z.array(z.string()),
+  // "Build around specific pieces": up to MAX_LOCKED_PIECES owned pieces every build must include.
+  use_locked_pieces: z.boolean(),
+  locked_pieces: z.array(
+    z.object({
+      isClassItem: z.boolean(),
+      archetype: z.string(),
+      tertiary: z.string(),
+      tuningMode: z.enum(['none', 'balanced', 'flexible', 'tuned']),
+      tunedStat: z.string().optional(),
+    }),
+  ),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -151,6 +171,8 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
     use_fragments: false,
     fragment_subclass: '',
     fragments: [] as string[],
+    use_locked_pieces: false,
+    locked_pieces: [] as LockedPiece[],
   }), [])
 
   // Load persisted state from sessionStorage first
@@ -275,6 +297,58 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
     setField('fragments', next)
   }
 
+  // --- Locked ("build around these") pieces -------------------------------------------------
+  const lockedPieces: LockedPiece[] = watchedValues.locked_pieces || []
+  const classItemLockCount = lockedPieces.filter((p) => p.isClassItem).length
+
+  const setLockedPieces = (next: LockedPiece[]) => setField('locked_pieces', next)
+
+  const addLockedPiece = () => {
+    if (lockedPieces.length >= MAX_LOCKED_PIECES) return
+    const first = ARCHETYPES[0]
+    setLockedPieces([
+      ...lockedPieces,
+      {
+        isClassItem: false,
+        archetype: first.name,
+        tertiary: tertiaryOptions(first.name)[0],
+        tuningMode: 'none',
+        tunedStat: undefined,
+      },
+    ])
+  }
+
+  const removeLockedPiece = (index: number) => {
+    setLockedPieces(lockedPieces.filter((_, i) => i !== index))
+  }
+
+  // Patch one locked piece, repairing dependent fields (tertiary must stay valid for the
+  // archetype; tunedStat only applies to the "tuned" mode).
+  const updateLockedPiece = (index: number, patch: Partial<LockedPiece>) => {
+    const next = lockedPieces.map((p, i) => {
+      if (i !== index) return p
+      const merged = { ...p, ...patch }
+      const validTertiaries = tertiaryOptions(merged.archetype)
+      if (!validTertiaries.includes(merged.tertiary as (typeof validTertiaries)[number])) {
+        merged.tertiary = validTertiaries[0]
+      }
+      if (merged.tuningMode !== 'tuned') merged.tunedStat = undefined
+      else if (!merged.tunedStat) merged.tunedStat = STAT_NAMES[0]
+      return merged
+    })
+    setLockedPieces(next)
+  }
+
+  // A locked class item and the exotic class item both occupy the class slot.
+  const lockedClassItemConflict =
+    watchedValues.use_locked_pieces && classItemLockCount > 0 && watchedValues.use_class_item_exotic
+
+  const lockedPiecesInvalid =
+    watchedValues.use_locked_pieces &&
+    (lockedPieces.some((p) => !isLockedPieceValid(p)) ||
+      classItemLockCount > 1 ||
+      lockedClassItemConflict)
+
   const over = totalStats > maxPossibleStats
   const meterPct = Math.min(100, (totalStats / maxPossibleStats) * 100)
 
@@ -299,7 +373,8 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
   const submitDisabled =
     isLoading ||
     hasMissingPerks() ||
-    (watchedValues.use_class_item_exotic && !isValidPerkCombination())
+    (watchedValues.use_class_item_exotic && !isValidPerkCombination()) ||
+    lockedPiecesInvalid
 
   return (
     <form className="form-col" onSubmit={form.handleSubmit(onSubmit)}>
@@ -575,6 +650,166 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
                       </span>
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="opt-row">
+            <div className="opt-main">
+              <div className="opt-label">
+                Build Around Specific Pieces
+                <ForgeTooltip>
+                  Lock up to {MAX_LOCKED_PIECES} armor pieces you already own. Every build will
+                  include them and optimize the remaining slots around them. Their tuning is
+                  honored even when &ldquo;Allow Tuning Mods&rdquo; is off, and they&apos;re
+                  pre-marked as acquired in saved checklists.
+                </ForgeTooltip>
+              </div>
+              <div className="opt-desc">
+                Pin owned pieces (archetype, tertiary, tuning) and optimize the rest of the build
+                around them.
+              </div>
+            </div>
+            <ForgeSwitch
+              checked={watchedValues.use_locked_pieces}
+              onChange={(v) => setField('use_locked_pieces', v)}
+              ariaLabel="Build around specific pieces"
+            />
+          </div>
+
+          {watchedValues.use_locked_pieces && (
+            <div className="opt-nest">
+              {lockedPieces.length === 0 && (
+                <div className="opt-desc" style={{ marginBottom: 12 }}>
+                  No pieces locked yet. Add a piece you already own to build around it.
+                </div>
+              )}
+
+              <div className="locked-list">
+                {lockedPieces.map((piece, index) => {
+                  const archItems: ForgeSelectItem[] = ARCHETYPES.map((a) => ({
+                    value: a.name,
+                    label: a.name,
+                  }))
+                  const tertItems: ForgeSelectItem[] = tertiaryOptions(piece.archetype).map((s) => ({
+                    value: s,
+                    label: s,
+                  }))
+                  const tuningItems: ForgeSelectItem[] = [
+                    { value: 'none', label: 'No tuning' },
+                    { value: 'flexible', label: 'Flexible (optimizer decides)' },
+                    { value: 'balanced', label: 'Balanced (+1 lowest 3)' },
+                    { value: 'tuned', label: '+5 specific stat…' },
+                  ]
+                  const tunedStatItems: ForgeSelectItem[] = STAT_NAMES.map((s) => ({
+                    value: s,
+                    label: `+5 ${s}`,
+                  }))
+                  return (
+                    <div className="locked-card" key={index}>
+                      <div className="locked-card-head">
+                        <span className="subhead" style={{ margin: 0 }}>
+                          Piece {index + 1}
+                        </span>
+                        <button
+                          type="button"
+                          className="btn icon sm"
+                          onClick={() => removeLockedPiece(index)}
+                          aria-label={`Remove piece ${index + 1}`}
+                        >
+                          <Icon.x style={{ width: 14, height: 14 }} />
+                        </button>
+                      </div>
+
+                      <label className="locked-slot-toggle">
+                        <ForgeSwitch
+                          checked={piece.isClassItem}
+                          onChange={(v) => updateLockedPiece(index, { isClassItem: v })}
+                          ariaLabel="This piece is a class item"
+                        />
+                        <span>Class item (occupies the class slot)</span>
+                      </label>
+
+                      <div className="perk-grid">
+                        <div>
+                          <div className="subhead" style={{ margin: '0 0 8px' }}>
+                            Archetype
+                          </div>
+                          <ForgeSelect
+                            value={piece.archetype}
+                            items={archItems}
+                            onChange={(v) => updateLockedPiece(index, { archetype: v })}
+                          />
+                        </div>
+                        <div>
+                          <div className="subhead" style={{ margin: '0 0 8px' }}>
+                            Tertiary Stat
+                          </div>
+                          <ForgeSelect
+                            value={piece.tertiary}
+                            items={tertItems}
+                            onChange={(v) => updateLockedPiece(index, { tertiary: v })}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="perk-grid" style={{ marginTop: 10 }}>
+                        <div>
+                          <div className="subhead" style={{ margin: '0 0 8px' }}>
+                            Tuning
+                          </div>
+                          <ForgeSelect
+                            value={piece.tuningMode}
+                            items={tuningItems}
+                            onChange={(v) =>
+                              updateLockedPiece(index, { tuningMode: v as LockedTuningMode })
+                            }
+                          />
+                        </div>
+                        {piece.tuningMode === 'tuned' && (
+                          <div>
+                            <div className="subhead" style={{ margin: '0 0 8px' }}>
+                              +5 Target
+                            </div>
+                            <ForgeSelect
+                              value={piece.tunedStat}
+                              placeholder="Select stat"
+                              items={tunedStatItems}
+                              onChange={(v) => updateLockedPiece(index, { tunedStat: v })}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {lockedPieces.length < MAX_LOCKED_PIECES && (
+                <button
+                  type="button"
+                  className="btn sm"
+                  style={{ marginTop: lockedPieces.length ? 12 : 0 }}
+                  onClick={addLockedPiece}
+                >
+                  <Icon.plus style={{ width: 14, height: 14 }} /> Add Piece
+                </button>
+              )}
+
+              {classItemLockCount > 1 && (
+                <div className="notice bad" style={{ marginTop: 12 }}>
+                  <Icon.alert className="ic" />
+                  <span>Only one locked class item is allowed.</span>
+                </div>
+              )}
+              {lockedClassItemConflict && (
+                <div className="notice bad" style={{ marginTop: 12 }}>
+                  <Icon.alert className="ic" />
+                  <span>
+                    A locked class item conflicts with the Exotic Class Item — both use the class
+                    slot. Turn one off.
+                  </span>
                 </div>
               )}
             </div>
