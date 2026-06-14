@@ -19,8 +19,12 @@ import { readJSON, writeJSON } from '@/lib/storage'
 import { SUBCLASSES, SUBCLASS_BY_ID, computeFragmentBonuses } from '@/lib/fragments'
 import {
   ARCHETYPES,
+  GEAR_SLOTS,
+  GEAR_SLOT_LABEL,
   tertiaryOptions,
   isLockedPieceValid,
+  sanitizeLockedPieces,
+  type GearSlot,
   type LockedPiece,
   type LockedTuningMode,
 } from '@/lib/archetypes'
@@ -132,7 +136,7 @@ const formSchema = z.object({
   use_locked_pieces: z.boolean(),
   locked_pieces: z.array(
     z.object({
-      isClassItem: z.boolean(),
+      slot: z.enum(['helmet', 'arms', 'chest', 'legs', 'class']),
       archetype: z.string(),
       tertiary: z.string(),
       tuningMode: z.enum(['none', 'balanced', 'flexible', 'tuned']),
@@ -175,9 +179,15 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
     locked_pieces: [] as LockedPiece[],
   }), [])
 
-  // Load persisted state from sessionStorage first
-  const loadPersistedState = (): Partial<FormData> =>
-    readJSON<Partial<FormData>>('session', STORAGE_KEYS.formState, {})
+  // Load persisted state from sessionStorage first. Locked pieces are repaired/migrated so
+  // stale-shaped entries (e.g. an older session) can't reach the solver malformed.
+  const loadPersistedState = (): Partial<FormData> => {
+    const saved = readJSON<Partial<FormData>>('session', STORAGE_KEYS.formState, {})
+    if (saved && 'locked_pieces' in saved) {
+      saved.locked_pieces = sanitizeLockedPieces(saved.locked_pieces)
+    }
+    return saved
+  }
 
   // Save state to sessionStorage
   const saveFormState = (data: Partial<FormData>) => {
@@ -299,17 +309,35 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
 
   // --- Locked ("build around these") pieces -------------------------------------------------
   const lockedPieces: LockedPiece[] = watchedValues.locked_pieces || []
-  const classItemLockCount = lockedPieces.filter((p) => p.isClassItem).length
+  const usesClassSlot = lockedPieces.some((p) => p.slot === 'class')
 
   const setLockedPieces = (next: LockedPiece[]) => setField('locked_pieces', next)
 
+  // Slots already claimed by other locked pieces (so a piece can't double-book a slot). When
+  // the exotic class item is enabled it owns the class slot, so that's unavailable too.
+  const usedSlots = (exceptIndex: number): Set<GearSlot> => {
+    const taken = new Set<GearSlot>()
+    lockedPieces.forEach((p, i) => {
+      if (i !== exceptIndex) taken.add(p.slot)
+    })
+    if (watchedValues.use_class_item_exotic) taken.add('class')
+    return taken
+  }
+
+  const firstFreeSlot = (): GearSlot | null => {
+    const taken = usedSlots(-1)
+    return GEAR_SLOTS.find((s) => !taken.has(s)) ?? null
+  }
+
   const addLockedPiece = () => {
     if (lockedPieces.length >= MAX_LOCKED_PIECES) return
+    const slot = firstFreeSlot()
+    if (!slot) return
     const first = ARCHETYPES[0]
     setLockedPieces([
       ...lockedPieces,
       {
-        isClassItem: false,
+        slot,
         archetype: first.name,
         tertiary: tertiaryOptions(first.name)[0],
         tuningMode: 'none',
@@ -341,13 +369,14 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
 
   // A locked class item and the exotic class item both occupy the class slot.
   const lockedClassItemConflict =
-    watchedValues.use_locked_pieces && classItemLockCount > 0 && watchedValues.use_class_item_exotic
+    watchedValues.use_locked_pieces && usesClassSlot && watchedValues.use_class_item_exotic
+
+  const duplicateSlots =
+    new Set(lockedPieces.map((p) => p.slot)).size !== lockedPieces.length
 
   const lockedPiecesInvalid =
     watchedValues.use_locked_pieces &&
-    (lockedPieces.some((p) => !isLockedPieceValid(p)) ||
-      classItemLockCount > 1 ||
-      lockedClassItemConflict)
+    (lockedPieces.some((p) => !isLockedPieceValid(p)) || duplicateSlots || lockedClassItemConflict)
 
   const over = totalStats > maxPossibleStats
   const meterPct = Math.min(100, (totalStats / maxPossibleStats) * 100)
@@ -688,6 +717,14 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
 
               <div className="locked-list">
                 {lockedPieces.map((piece, index) => {
+                  const taken = usedSlots(index)
+                  const slotItems: ForgeSelectItem[] = GEAR_SLOTS.map((s) => ({
+                    value: s,
+                    label:
+                      GEAR_SLOT_LABEL[s] +
+                      (s === 'class' && watchedValues.use_class_item_exotic ? ' (exotic in use)' : ''),
+                    disabled: taken.has(s),
+                  }))
                   const archItems: ForgeSelectItem[] = ARCHETYPES.map((a) => ({
                     value: a.name,
                     label: a.name,
@@ -722,16 +759,17 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
                         </button>
                       </div>
 
-                      <label className="locked-slot-toggle">
-                        <ForgeSwitch
-                          checked={piece.isClassItem}
-                          onChange={(v) => updateLockedPiece(index, { isClassItem: v })}
-                          ariaLabel="This piece is a class item"
-                        />
-                        <span>Class item (occupies the class slot)</span>
-                      </label>
-
                       <div className="perk-grid">
+                        <div>
+                          <div className="subhead" style={{ margin: '0 0 8px' }}>
+                            Slot
+                          </div>
+                          <ForgeSelect
+                            value={piece.slot}
+                            items={slotItems}
+                            onChange={(v) => updateLockedPiece(index, { slot: v as GearSlot })}
+                          />
+                        </div>
                         <div>
                           <div className="subhead" style={{ margin: '0 0 8px' }}>
                             Archetype
@@ -742,6 +780,9 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
                             onChange={(v) => updateLockedPiece(index, { archetype: v })}
                           />
                         </div>
+                      </div>
+
+                      <div className="perk-grid" style={{ marginTop: 10 }}>
                         <div>
                           <div className="subhead" style={{ margin: '0 0 8px' }}>
                             Tertiary Stat
@@ -752,6 +793,7 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
                             onChange={(v) => updateLockedPiece(index, { tertiary: v })}
                           />
                         </div>
+                        <div />
                       </div>
 
                       <div className="perk-grid" style={{ marginTop: 10 }}>
@@ -797,10 +839,10 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
                 </button>
               )}
 
-              {classItemLockCount > 1 && (
+              {duplicateSlots && (
                 <div className="notice bad" style={{ marginTop: 12 }}>
                   <Icon.alert className="ic" />
-                  <span>Only one locked class item is allowed.</span>
+                  <span>Each locked piece must use a different gear slot.</span>
                 </div>
               )}
               {lockedClassItemConflict && (

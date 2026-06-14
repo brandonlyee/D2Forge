@@ -6,6 +6,7 @@ import { FragmentList } from '@/components/fragment-list'
 import { Logo, Icon } from '@/components/forge/icons'
 import { expandSolutionToChecklist, saveChecklist } from '@/lib/checklist-utils'
 import type { FragmentSelection } from '@/lib/fragments'
+import { GEAR_SLOTS, GEAR_SLOT_LABEL, type GearSlot } from '@/lib/archetypes'
 import type { PieceType, Solution } from '@/types/solution'
 import { STAT_NAMES, STORAGE_KEYS } from '@/lib/constants'
 import { readJSON, writeJSON, parsePiece } from '@/lib/storage'
@@ -302,9 +303,12 @@ export function SolutionDisplay({ solutions, desiredStats, fragments = null, isL
                   if (group.pieces.length === 0) return null
                   const firstPiece = group.pieces[0].piece
                   const isExotic = firstPiece.arch.toLowerCase().includes('exotic')
-                  const isLocked = firstPiece.slot === 'armor' || firstPiece.slot === 'class'
+                  const lockedSlot = GEAR_SLOTS.includes((firstPiece.slot ?? '') as GearSlot)
+                    ? (firstPiece.slot as GearSlot)
+                    : null
+                  const isLocked = lockedSlot !== null
                   const isClassItem =
-                    firstPiece.arch.toLowerCase().includes('class item') || firstPiece.slot === 'class'
+                    firstPiece.arch.toLowerCase().includes('class item') || lockedSlot === 'class'
                   // Every piece (including the Exotic Class Item) has an open tuning slot.
                   const isFlexible =
                     firstPiece.tuning_mode === 'tuned' || firstPiece.tuning_mode === 'none'
@@ -322,9 +326,13 @@ export function SolutionDisplay({ solutions, desiredStats, fragments = null, isL
                     tuningDesc = isLocked ? 'Tuning honored on owned piece' : 'Accepts any ±5 tuning mod'
                   }
 
-                  // Owned pieces show their slot kind ("Class Item" vs "Armor"); farmed pieces
-                  // keep the existing label.
-                  const nameSuffix = isExotic ? '' : firstPiece.slot === 'class' ? ' Class Item' : ' Armor'
+                  // Owned pieces show their concrete slot (e.g. "Demolitionist Helmet"); farmed
+                  // pieces keep the existing "Armor" label.
+                  const nameSuffix = isExotic
+                    ? ''
+                    : lockedSlot
+                    ? ` ${GEAR_SLOT_LABEL[lockedSlot]}`
+                    : ' Armor'
 
                   return (
                     <div

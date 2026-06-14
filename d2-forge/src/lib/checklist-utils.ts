@@ -27,11 +27,10 @@ export function expandSolutionToChecklist(
   const modItems: ChecklistModItem[] = []
   const tuningItems: ChecklistTuningItem[] = []
 
-  // User-locked pieces (piece.slot set) are already owned, so they're pre-assigned to a slot
-  // and pre-completed below. Class-item locks take the class slot; armor locks fill the
-  // remaining gear slots in order.
+  // User-locked pieces carry their concrete gear slot (helmet/arms/chest/legs/class). They're
+  // already owned, so they're pre-assigned to that exact slot and pre-completed below.
   const slotsUsed: SlotsUsed = { helmet: null, arms: null, chest: null, legs: null, class: null }
-  const freeArmorSlots: ArmorSlot[] = ['helmet', 'arms', 'chest', 'legs']
+  const GEAR_SLOTS: ArmorSlot[] = ['helmet', 'arms', 'chest', 'legs', 'class']
 
   // Expand armor pieces from grouped format to individual items
   Object.entries(solution.pieces).forEach(([pieceKey, count]) => {
@@ -42,8 +41,11 @@ export function expandSolutionToChecklist(
     for (let i = 0; i < count; i++) {
       const isExotic = piece.arch.toLowerCase().includes('exotic')
       const isExoticClassItem = piece.arch.toLowerCase().includes('exotic class item')
-      const isLocked = piece.slot === 'armor' || piece.slot === 'class'
-      const isClassItem = piece.slot === 'class'
+      const lockedSlot = (GEAR_SLOTS as string[]).includes(piece.slot ?? '')
+        ? (piece.slot as ArmorSlot)
+        : null
+      const isLocked = lockedSlot !== null
+      const isClassItem = lockedSlot === 'class'
 
       // Every piece — including the Exotic Class Item — has an open tuning slot.
       // Backend "none"/"tuned" both mean the slot can take a +5/-5 mod, so surface
@@ -53,13 +55,9 @@ export function expandSolutionToChecklist(
 
       const itemId = generateId()
 
-      // Pre-assign owned pieces to a concrete slot and mark them acquired.
-      let assignedSlot: ArmorSlot | null = null
-      if (isClassItem && !slotsUsed.class) {
-        assignedSlot = 'class'
-      } else if (isLocked) {
-        assignedSlot = freeArmorSlots.shift() ?? null
-      }
+      // Pre-assign owned pieces to their exact slot and mark them acquired.
+      const assignedSlot: ArmorSlot | null =
+        lockedSlot && !slotsUsed[lockedSlot] ? lockedSlot : null
       if (assignedSlot) slotsUsed[assignedSlot] = itemId
 
       armorItems.push({

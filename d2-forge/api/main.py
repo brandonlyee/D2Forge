@@ -190,6 +190,10 @@ def generate_piece_types(allow_tuned=True, *, use_class_item_exotic=False, exoti
 
 ARCHETYPE_BY_NAME = {a.name: a for a in ARCHETYPES}
 
+# The five concrete gear slots. Each user-locked piece occupies exactly one; "class" is the
+# class-item slot (and the only one that conflicts with an exotic class item).
+LOCKED_SLOTS = ["helmet", "arms", "chest", "legs", "class"]
+
 
 def _locked_piece_variants(spec):
     """Build every solver variant for a single user-locked piece.
@@ -198,15 +202,18 @@ def _locked_piece_variants(spec):
     archetype + tertiary (the farmed roll) and its tuning *intent* are fixed by the user; the
     +10 mod target — and, for a specific +5 tuning, the −5 donor — are still chosen by the
     optimizer. We therefore emit one variant per (mod_target [, siphon]) combination consistent
-    with the spec, all tagged with ``slot`` so they stay distinct from solver-chosen pieces and
-    can be surfaced as "owned" downstream.
+    with the spec, all tagged with the piece's concrete ``slot`` so they stay distinct from
+    solver-chosen pieces (and from each other) and can be surfaced as "owned" downstream.
+
+    Because ``slot`` is part of the piece identity, two locked pieces never collapse into one
+    variable even when their rolls are identical — they live in different gear slots.
 
     ``spec`` keys:
-      arch          archetype name (must be in ARCHETYPES)
-      tertiary      tertiary stat name (must differ from the archetype's primary/secondary)
-      is_class_item True -> occupies the class slot (slot="class"); else slot="armor"
-      tuning_mode   "none" | "balanced" | "tuned" | "flexible"
-      tuned_stat    target stat for the +5 (required when tuning_mode == "tuned")
+      arch        archetype name (must be in ARCHETYPES)
+      tertiary    tertiary stat name (must differ from the archetype's primary/secondary)
+      slot        one of LOCKED_SLOTS — the gear slot this owned piece occupies
+      tuning_mode "none" | "balanced" | "tuned" | "flexible"
+      tuned_stat  target stat for the +5 (required when tuning_mode == "tuned")
 
     Unlike normal/exotic pieces, locked tuning is honoured regardless of the global
     ``allow_tuned`` toggle — the user explicitly curated these pieces.
@@ -233,7 +240,9 @@ def _locked_piece_variants(spec):
         if tuned_stat not in STAT_NAMES:
             raise ValueError(f"tuning_mode 'tuned' requires a valid tuned_stat, got {tuned_stat!r}")
 
-    slot = "class" if spec.get("is_class_item") else "armor"
+    slot = spec.get("slot")
+    if slot not in LOCKED_SLOTS:
+        raise ValueError(f"Invalid locked-piece slot {slot!r}: must be one of {LOCKED_SLOTS}")
 
     base = [BASE_FIVE] * 6
     base[STAT_IDX[prim]] = PRIMARY_VAL
@@ -280,41 +289,32 @@ def _locked_piece_variants(spec):
 def add_locked_pieces(piece_types, piece_stats, locked_pieces):
     """Register user-locked pieces into the solver pools and return their constraint groups.
 
-    ``locked_pieces`` is a list of spec dicts (see ``_locked_piece_variants``). Identical specs
-    are merged so the solver requires the right *count* of that piece. Returns a list of
-    ``(variant_piece_types, required_count)`` tuples; the caller adds one equality constraint per
-    group (sum of the group's variables == required_count) so every build contains exactly the
-    locked pieces. Mutates ``piece_types``/``piece_stats`` in place.
+    ``locked_pieces`` is a list of spec dicts (see ``_locked_piece_variants``). Each piece
+    occupies a distinct gear slot, so every piece becomes its own group requiring exactly one
+    selection. Returns a list of ``(variant_piece_types, required_count)`` tuples; the caller
+    adds one equality constraint per group (sum of the group's variables == 1) so every build
+    contains exactly the locked pieces. Mutates ``piece_types``/``piece_stats`` in place.
+
+    Raises ValueError if two locked pieces claim the same slot.
     """
     if not locked_pieces:
         return []
 
-    # Merge identical specs into (canonical_key -> [spec, count]).
-    merged = {}
-    order = []
-    for spec in locked_pieces:
-        key = (
-            spec.get("arch"),
-            spec.get("tertiary"),
-            bool(spec.get("is_class_item")),
-            spec.get("tuning_mode", "none"),
-            spec.get("tuned_stat"),
-        )
-        if key not in merged:
-            merged[key] = [spec, 0]
-            order.append(key)
-        merged[key][1] += 1
-
+    seen_slots = set()
     groups = []
-    for key in order:
-        spec, count = merged[key]
+    for spec in locked_pieces:
+        slot = spec.get("slot")
+        if slot in seen_slots:
+            raise ValueError(f"Two locked pieces both use the {slot!r} slot")
+        seen_slots.add(slot)
+
         variants = _locked_piece_variants(spec)
         group_vars = []
         for p, stats in variants:
             piece_types.append(p)
             piece_stats[p] = stats
             group_vars.append(p)
-        groups.append((group_vars, count))
+        groups.append((group_vars, 1))
     return groups
 
 

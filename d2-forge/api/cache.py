@@ -28,7 +28,9 @@ class ResponseCache:
     
     def _get_cache_key(self, request_data: Dict[str, Any]) -> str:
         """Generate a hash key for the request."""
-        # Extract only the relevant optimization parameters
+        # Extract only the relevant optimization parameters. Every input that changes the solve
+        # must be here, or two different requests would collide on the same cache entry (e.g.
+        # toggling locked pieces or fragments off would otherwise return a stale prior result).
         cache_params = {
             'Health': request_data.get('Health', 0),
             'Melee': request_data.get('Melee', 0),
@@ -39,7 +41,9 @@ class ResponseCache:
             'allow_tuned': request_data.get('allow_tuned', True),
             'use_class_item_exotic': request_data.get('use_class_item_exotic', False),
             'exotic_perks': request_data.get('exotic_perks'),
-            'minimum_constraints': request_data.get('minimum_constraints')
+            'minimum_constraints': request_data.get('minimum_constraints'),
+            'fragment_bonuses': request_data.get('fragment_bonuses'),
+            'locked_pieces': request_data.get('locked_pieces'),
         }
         
         # Create deterministic hash

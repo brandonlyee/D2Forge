@@ -36,8 +36,22 @@ export const ARCHETYPE_BY_NAME: Record<string, Archetype> = Object.fromEntries(
 // the −5 donor); "flexible" lets the optimizer choose everything; "none"/"balanced" are fixed.
 export type LockedTuningMode = 'none' | 'balanced' | 'flexible' | 'tuned'
 
+// The five concrete gear slots a locked piece can occupy.
+export type GearSlot = 'helmet' | 'arms' | 'chest' | 'legs' | 'class'
+
+export const GEAR_SLOTS: GearSlot[] = ['helmet', 'arms', 'chest', 'legs', 'class']
+
+export const GEAR_SLOT_LABEL: Record<GearSlot, string> = {
+  helmet: 'Helmet',
+  arms: 'Arms',
+  chest: 'Chest',
+  legs: 'Legs',
+  class: 'Class Item',
+}
+
 export interface LockedPiece {
-  isClassItem: boolean
+  // The concrete gear slot this owned piece occupies (so the checklist pre-checks the right one).
+  slot: GearSlot
   archetype: string
   tertiary: string
   tuningMode: LockedTuningMode
@@ -51,9 +65,10 @@ export function tertiaryOptions(archetypeName: string): StatName[] {
   return STAT_NAMES.filter((s) => s !== arch.primary && s !== arch.secondary)
 }
 
-// A locked piece is complete enough to send once it has a valid archetype + tertiary (and, for
-// the "tuned" mode, a +5 target stat).
+// A locked piece is complete enough to send once it has a valid slot + archetype + tertiary
+// (and, for the "tuned" mode, a +5 target stat).
 export function isLockedPieceValid(p: LockedPiece): boolean {
+  if (!GEAR_SLOTS.includes(p.slot)) return false
   const arch = ARCHETYPE_BY_NAME[p.archetype]
   if (!arch) return false
   if (!tertiaryOptions(p.archetype).includes(p.tertiary as StatName)) return false
@@ -61,10 +76,50 @@ export function isLockedPieceValid(p: LockedPiece): boolean {
   return true
 }
 
+// Coerce arbitrary (possibly stale-shaped) persisted data into well-formed LockedPieces:
+// migrate the legacy `isClassItem` flag to a concrete slot, assign any missing/duplicate slots
+// to the first free gear slot, and drop entries that can't be repaired.
+export function sanitizeLockedPieces(raw: unknown): LockedPiece[] {
+  if (!Array.isArray(raw)) return []
+  const used = new Set<GearSlot>()
+  const out: LockedPiece[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const r = item as Record<string, unknown>
+    const archetype = typeof r.archetype === 'string' && ARCHETYPE_BY_NAME[r.archetype]
+      ? r.archetype
+      : ARCHETYPES[0].name
+    const tertOpts = tertiaryOptions(archetype)
+    const tertiary = typeof r.tertiary === 'string' && tertOpts.includes(r.tertiary as StatName)
+      ? r.tertiary
+      : tertOpts[0]
+    const tuningMode: LockedTuningMode =
+      r.tuningMode === 'balanced' || r.tuningMode === 'flexible' || r.tuningMode === 'tuned'
+        ? r.tuningMode
+        : 'none'
+
+    // Prefer an explicit valid slot; else migrate legacy isClassItem; else first free slot.
+    let slot = GEAR_SLOTS.includes(r.slot as GearSlot) ? (r.slot as GearSlot) : undefined
+    if (!slot && r.isClassItem === true) slot = 'class'
+    if (!slot || used.has(slot)) slot = GEAR_SLOTS.find((s) => !used.has(s))
+    if (!slot) break // all five slots taken
+    used.add(slot)
+
+    out.push({
+      slot,
+      archetype,
+      tertiary,
+      tuningMode,
+      tunedStat: tuningMode === 'tuned' && typeof r.tunedStat === 'string' ? r.tunedStat : undefined,
+    })
+  }
+  return out
+}
+
 // Map a locked piece to the snake_case shape the backend expects.
 export function lockedPieceToRequest(p: LockedPiece) {
   return {
-    is_class_item: p.isClassItem,
+    slot: p.slot,
     arch: p.archetype,
     tertiary: p.tertiary,
     tuning_mode: p.tuningMode,

@@ -86,13 +86,13 @@ class handler(BaseHTTPRequestHandler):
                         "error": "At most 4 locked pieces are allowed.",
                     }, status=400, methods=METHODS)
                     return
-                class_item_locks = sum(1 for p in locked_pieces if p.get('is_class_item'))
-                if class_item_locks > 1:
+                slots = [p.get('slot') for p in locked_pieces]
+                if len(set(slots)) != len(slots):
                     send_json(self, {
-                        "error": "Only one locked class item is allowed.",
+                        "error": "Each locked piece must use a different gear slot.",
                     }, status=400, methods=METHODS)
                     return
-                if class_item_locks and use_class_item_exotic:
+                if 'class' in slots and use_class_item_exotic:
                     send_json(self, {
                         "error": "A locked class item conflicts with the exotic class item; "
                                  "both occupy the class slot. Disable one.",
