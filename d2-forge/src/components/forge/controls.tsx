@@ -37,7 +37,7 @@ export function ForgeSlider({
   value,
   onChange,
   min = 0,
-  max = 225,
+  max = 200,
   step = 5,
   floor = null,
   locked = false,
@@ -133,7 +133,7 @@ export function ForgeNumberField({
   value,
   onChange,
   min = 0,
-  max = 225,
+  max = 200,
 }: {
   value: number
   onChange: (v: number) => void

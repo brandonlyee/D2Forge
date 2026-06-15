@@ -121,7 +121,7 @@ defined in `ARCHETYPES` in `api/main.py` (the source of truth):
 
 ### Form Validation
 The StatInputForm component includes complex validation for:
-- Stat totals (0-225 per stat, max 515 total before fragment shifts)
+- Stat totals (0-200 per stat, max 515 total before fragment shifts)
 - Exotic perk combinations (specific valid pairs)
 - Subclass-fragment selection (single subclass at a time)
 - Minimum constraint locks

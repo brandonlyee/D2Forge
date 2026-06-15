@@ -110,12 +110,12 @@ const PERK2_TO_PERK1_MAPPING = Object.entries(EXOTIC_PERK_MAPPING).reduce((acc, 
 }, {} as Record<string, string[]>)
 
 const formSchema = z.object({
-  Health: z.number().min(0).max(225),
-  Melee: z.number().min(0).max(225),
-  Grenade: z.number().min(0).max(225),
-  Super: z.number().min(0).max(225),
-  Class: z.number().min(0).max(225),
-  Weapons: z.number().min(0).max(225),
+  Health: z.number().min(0).max(200),
+  Melee: z.number().min(0).max(200),
+  Grenade: z.number().min(0).max(200),
+  Super: z.number().min(0).max(200),
+  Class: z.number().min(0).max(200),
+  Weapons: z.number().min(0).max(200),
   // Minimum constraint locks for each stat
   Health_min: z.boolean(),
   Melee_min: z.boolean(),
