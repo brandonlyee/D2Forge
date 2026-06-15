@@ -67,6 +67,7 @@ export function expandSolutionToChecklist(
         isExotic,
         isExoticClassItem,
         isLocked,
+        lockedSlot,
         isClassItem,
         tuningMode,
         assignedSlot,
@@ -139,9 +140,18 @@ export function expandSolutionToChecklist(
 
 // Get available slots for an armor item
 export function getAvailableSlots(
-  item: ChecklistArmorItem, 
+  item: ChecklistArmorItem,
   slotsUsed: SlotsUsed
 ): string[] {
+  // User-locked (owned) pieces are pinned to the exact slot they were specified for and can't
+  // be moved — regardless of which slot that is (helmet/arms/chest/legs/class). Pin to the
+  // persisted lockedSlot so it stays fixed even if the piece is toggled off and back on
+  // (falling back to assignedSlot for checklists saved before lockedSlot existed).
+  const pinnedSlot = item.isLocked ? item.lockedSlot ?? item.assignedSlot : null
+  if (pinnedSlot) {
+    return [pinnedSlot]
+  }
+
   // Both exotic and locked legendary class items belong in the class slot.
   if (item.isExoticClassItem || item.isClassItem) {
     return slotsUsed.class && slotsUsed.class !== item.id ? [] : ['class']

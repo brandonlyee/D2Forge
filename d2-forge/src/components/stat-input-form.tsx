@@ -688,6 +688,7 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
             <div className="opt-main">
               <div className="opt-label">
                 Build Around Specific Pieces
+                <span className="beta-tag">Beta</span>
                 <ForgeTooltip>
                   Lock up to {MAX_LOCKED_PIECES} armor pieces you already own. Every build will
                   include them and optimize the remaining slots around them. Their tuning is
