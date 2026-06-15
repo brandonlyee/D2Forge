@@ -123,6 +123,14 @@ const formSchema = z.object({
   Super_min: z.boolean(),
   Class_min: z.boolean(),
   Weapons_min: z.boolean(),
+  // "Ignore" flags: a don't-care dump stat with no target, floor, or penalty.
+  // Mutually exclusive with the matching _min lock.
+  Health_ignore: z.boolean(),
+  Melee_ignore: z.boolean(),
+  Grenade_ignore: z.boolean(),
+  Super_ignore: z.boolean(),
+  Class_ignore: z.boolean(),
+  Weapons_ignore: z.boolean(),
   allow_tuned: z.boolean(),
   use_class_item_exotic: z.boolean(),
   exotic_perk1: z.string().optional(),
@@ -168,6 +176,13 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
     Super_min: false,
     Class_min: false,
     Weapons_min: false,
+    // Default ignore flags to false
+    Health_ignore: false,
+    Melee_ignore: false,
+    Grenade_ignore: false,
+    Super_ignore: false,
+    Class_ignore: false,
+    Weapons_ignore: false,
     allow_tuned: true,
     use_class_item_exotic: false,
     exotic_perk1: '',
@@ -225,7 +240,14 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
   }, [form])
 
   const watchedValues = form.watch()
-  const totalStats = STAT_NAMES.reduce((sum, statName) => sum + (watchedValues[statName] || 0), 0)
+  // Ignored stats have no target, so they don't count toward the desired-total meter.
+  const totalStats = STAT_NAMES.reduce(
+    (sum, statName) =>
+      watchedValues[`${statName}_ignore` as keyof FormData]
+        ? sum
+        : sum + (watchedValues[statName] || 0),
+    0,
+  )
 
   // Selected fragments shift the baseline stats, which shifts the maximum achievable total
   // by the net of all their effects (e.g. one +10 fragment raises the max from 515 to 525).
@@ -290,6 +312,17 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
   // Direct field writers for the custom forge controls (RHF stays the source of truth).
   const setField = (name: keyof FormData, value: unknown) =>
     form.setValue(name, value as never, { shouldValidate: true })
+
+  // Min and Ignore are mutually exclusive per stat: a stat can't be both a hard floor and a
+  // don't-care dump stat. Enabling one clears the other.
+  const setMinLock = (statName: string, v: boolean) => {
+    setField(`${statName}_min` as keyof FormData, v)
+    if (v) setField(`${statName}_ignore` as keyof FormData, false)
+  }
+  const setIgnore = (statName: string, v: boolean) => {
+    setField(`${statName}_ignore` as keyof FormData, v)
+    if (v) setField(`${statName}_min` as keyof FormData, false)
+  }
 
   // Switch subclass. Since only one subclass's fragments may be equipped at a time, changing
   // the subclass clears any previously-selected fragments.
@@ -417,30 +450,54 @@ export function StatInputForm({ onSubmit, isLoading = false, initialValues }: St
           <div>
             {STAT_NAMES.map((statName) => {
               const value = watchedValues[statName] || 0
+              const ignored = Boolean(watchedValues[`${statName}_ignore` as keyof FormData])
               const locked = Boolean(watchedValues[`${statName}_min` as keyof FormData])
               return (
-                <div className="stat" key={statName}>
+                <div className={"stat" + (ignored ? " ignored" : "")} key={statName}>
                   <div className="stat-top">
                     <div className="stat-name">
                       <StatIcon stat={statName} size={18} /> {statName}
                     </div>
-                    <label className={"stat-lock" + (locked ? " active" : "")} title="Lock as minimum: solutions must have at least this value">
-                      <Icon.lock className="lk" />
-                      <span className="lbl">Min</span>
-                      <ForgeSwitch
-                        checked={locked}
-                        onChange={(v) => setField(`${statName}_min` as keyof FormData, v)}
-                        ariaLabel={`Lock ${statName} as minimum`}
-                      />
-                    </label>
+                    <div className="stat-toggles">
+                      <label
+                        className={"stat-lock" + (locked ? " active" : "") + (ignored ? " disabled" : "")}
+                        title="Lock as minimum: solutions must have at least this value"
+                      >
+                        <Icon.lock className="lk" />
+                        <span className="lbl">Min</span>
+                        <ForgeSwitch
+                          checked={locked}
+                          disabled={ignored}
+                          onChange={(v) => setMinLock(statName, v)}
+                          ariaLabel={`Lock ${statName} as minimum`}
+                        />
+                      </label>
+                      <label
+                        className={"stat-lock stat-ignore" + (ignored ? " active" : "")}
+                        title="Ignore: don't care about this stat — the optimizer may take points away from it"
+                      >
+                        <Icon.ban className="lk" />
+                        <span className="lbl">Ignore</span>
+                        <ForgeSwitch
+                          checked={ignored}
+                          onChange={(v) => setIgnore(statName, v)}
+                          ariaLabel={`Ignore ${statName}`}
+                        />
+                      </label>
+                    </div>
                   </div>
                   <div className="stat-ctl">
-                    <ForgeNumberField value={value} onChange={(v) => setField(statName, v)} />
+                    <ForgeNumberField
+                      value={value}
+                      onChange={(v) => setField(statName, v)}
+                      disabled={ignored}
+                    />
                     <ForgeSlider
                       value={value}
                       onChange={(v) => setField(statName, v)}
                       locked={locked}
                       floor={locked ? value : null}
+                      disabled={ignored}
                     />
                   </div>
                 </div>

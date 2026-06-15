@@ -56,6 +56,8 @@ class handler(BaseHTTPRequestHandler):
             use_class_item_exotic = request_data.get('use_class_item_exotic', False)
             exotic_perks = request_data.get('exotic_perks')
             minimum_constraints = request_data.get('minimum_constraints')
+            # Stats the user marked "ignore": free dump stats with no target, floor, or penalty.
+            ignored_stats = [s for s in (request_data.get('ignored_stats') or []) if s in STAT_NAMES]
 
             # Subclass fragments shift the player's baseline stats. The armor only needs to make
             # up the difference, so we subtract the fragment bonus from every target before
@@ -67,10 +69,11 @@ class handler(BaseHTTPRequestHandler):
                 for s in STAT_NAMES
             ]
 
-            # Shift any minimum constraints onto the same armor-only basis.
+            # Shift any minimum constraints onto the same armor-only basis. Ignored stats never
+            # carry a floor, so drop them defensively (the UI already keeps the two exclusive).
             if minimum_constraints:
                 minimum_constraints = {
-                    s: (None if minimum_constraints.get(s) is None
+                    s: (None if (s in ignored_stats or minimum_constraints.get(s) is None)
                         else minimum_constraints[s] - fragment_bonuses.get(s, 0))
                     for s in STAT_NAMES
                 }
@@ -141,6 +144,7 @@ class handler(BaseHTTPRequestHandler):
                 exact_timeout=EXACT_TIMEOUT_SECONDS,
                 minimum_constraints=minimum_constraints,
                 locked_groups=locked_groups,
+                ignored_stats=ignored_stats,
             )
 
             if not solutions_list:

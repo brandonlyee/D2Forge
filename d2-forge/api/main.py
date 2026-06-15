@@ -358,7 +358,7 @@ def identical_piece_check(desired_totals, piece_types, piece_stats):
 
 def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solutions=10, allow_tuned=True,
                              require_class_item=False, total_timeout=120, minimum_constraints=None,
-                             exact_timeout=None, locked_groups=None):
+                             exact_timeout=None, locked_groups=None, ignored_stats=None):
     """Find up to ``max_solutions`` armor builds for ``desired_totals``.
 
     Two phases, each independently time-bounded so the solve can never run unbounded:
@@ -371,6 +371,11 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
     """
     if not HAS_PULP:
         raise RuntimeError("pulp not installed; can't run MILP")
+
+    # Ignored stats are "don't care" dump stats: no exact-match, no deviation penalty, and
+    # no minimum floor. The solver is free to route tuning points out of them to feed the
+    # stats the user actually cares about.
+    ignored = set(ignored_stats or [])
 
     start_time = time.time()
     
@@ -416,17 +421,22 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
             for group_vars, count in locked_groups:
                 prob += pulp.lpSum(x[p] for p in group_vars) == count
 
-        # stat matching
+        # stat matching (ignored stats get no constraint at all — left fully free)
         for si, s in enumerate(STAT_NAMES):
+            if s in ignored:
+                continue
             total_stat = pulp.lpSum(x[p] * piece_stats[p][si] for p in piece_types)
             if allow_deviation:
                 prob += total_stat - desired_totals[si] == dev_pos[s] - dev_neg[s]
             else:
                 prob += total_stat == desired_totals[si]
-        
-        # minimum constraints (must be satisfied even with deviation)
+
+        # minimum constraints (must be satisfied even with deviation; never applied to
+        # ignored stats, which by definition have no floor)
         if minimum_constraints:
             for si, s in enumerate(STAT_NAMES):
+                if s in ignored:
+                    continue
                 min_value = minimum_constraints.get(s)
                 if min_value is not None:
                     total_stat = pulp.lpSum(x[p] * piece_stats[p][si] for p in piece_types)
@@ -436,8 +446,10 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
         ease_bonus = pulp.lpSum(x[p] * (1 if getattr(p, 'tuning_mode', 'none') != "tuned" else 0) for p in piece_types)
         if allow_deviation:
             # Weight negative deviations (missing stats) much more heavily than positive (excess stats)
-            # Missing stats hurt builds significantly more than having extra stats
-            deviation_cost = pulp.lpSum(0.2 * dev_pos[s] + 5.0 * dev_neg[s] for s in STAT_NAMES)
+            # Missing stats hurt builds significantly more than having extra stats.
+            # Ignored stats are excluded entirely so neither over- nor under-shooting them costs anything.
+            deviation_cost = pulp.lpSum(0.2 * dev_pos[s] + 5.0 * dev_neg[s]
+                                        for s in STAT_NAMES if s not in ignored)
             prob += deviation_cost - 0.01 * ease_bonus
         else:
             prob += -1 * ease_bonus
@@ -456,8 +468,10 @@ def solve_with_milp_multiple(desired_totals, piece_types, piece_stats, max_solut
         sol = {p: int(round(x[p].value())) for p in piece_types if x[p].value() and x[p].value() > 0.5}
         dev_total = 0.0
         if allow_deviation:
-            # Apply same weighting as in objective: negative deviations are much worse than positive
-            dev_total = sum(0.2 * (dev_pos[s].value() or 0) + 5.0 * (dev_neg[s].value() or 0) for s in STAT_NAMES)
+            # Apply same weighting as in objective: negative deviations are much worse than positive.
+            # Ignored stats are excluded so a meaningless "miss" on them doesn't pollute ranking.
+            dev_total = sum(0.2 * (dev_pos[s].value() or 0) + 5.0 * (dev_neg[s].value() or 0)
+                            for s in STAT_NAMES if s not in ignored)
         return normalize_solution(sol), dev_total
 
     # Phase 1: find exact solutions, bounded by ``exact_timeout`` (None = unbounded).

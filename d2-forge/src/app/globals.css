@@ -316,11 +316,17 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
 .stat-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .stat-name { display: flex; align-items: center; gap: 9px; font-size: 13.5px; font-weight: 500; color: var(--foreground); }
 .stat-name img { width: 18px; height: 18px; }
+.stat-toggles { display: flex; align-items: center; gap: 14px; }
 .stat-lock { display: flex; align-items: center; gap: 7px; cursor: pointer; }
 .stat-lock .lk { width: 12px; height: 12px; color: var(--faint-foreground); }
 .stat-lock.active .lk { color: var(--primary); }
 .stat-lock .lbl { font-family: var(--font-num); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint-foreground); }
 .stat-lock.active .lbl { color: var(--primary); }
+/* Ignore toggle uses the accent colour so it reads as distinct from the Min lock. */
+.stat-ignore.active .lk, .stat-ignore.active .lbl { color: var(--accent); }
+.stat-lock.disabled { opacity: .4; cursor: not-allowed; }
+/* An ignored stat's value controls are inert, so dim them to signal the value doesn't matter. */
+.stat.ignored .stat-ctl { opacity: .45; }
 .stat-ctl { display: grid; grid-template-columns: 58px 1fr; gap: 14px; align-items: center; }
 
 /* number field */
@@ -333,6 +339,7 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
 }
 .numfield::-webkit-outer-spin-button, .numfield::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .numfield:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--ring); }
+.numfield:disabled { cursor: not-allowed; color: var(--muted-foreground); }
 
 /* ============================================================================
    SLIDER (custom)
@@ -349,6 +356,7 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
 .slider:focus-within .thumb, .slider .thumb.drag { box-shadow: 0 0 0 5px var(--ring); }
 .slider.locked .range { background: linear-gradient(90deg, var(--primary), var(--accent)); }
 .slider .floor { position: absolute; top: 50%; width: 2px; height: 12px; background: var(--accent); transform: translate(-50%,-50%); z-index: 1; opacity: .8; }
+.slider.disabled { cursor: not-allowed; }
 
 /* ---------------- SWITCH / TOGGLE ---------------- */
 .switch {
@@ -361,6 +369,7 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
 .switch.on { background: var(--primary); }
 .switch.on::after { left: 14px; }
 .switch:focus-visible { box-shadow: 0 0 0 3px var(--ring); }
+.switch.disabled { opacity: .4; cursor: not-allowed; }
 
 /* big option toggle row */
 .opt-row {
@@ -567,6 +576,8 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
 .stat-table .bar-cell { width: 28%; }
 .stat-table .bar { height: 5px; background: var(--track); border-radius: 999px; overflow: hidden; }
 .stat-table .bar > span { display: block; height: 100%; background: var(--primary); border-radius: 999px; }
+.stat-table .ignored-tag { font-family: var(--font-num); font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent); border-radius: 999px; padding: 1px 6px; }
+.stat-table tr.is-ignored .nm, .stat-table tr.is-ignored td { color: var(--muted-foreground); }
 .stat-table td.diff-zero { color: var(--success); }
 .stat-table td.diff-over { color: var(--success); }
 .stat-table td.diff-under { color: var(--under); }

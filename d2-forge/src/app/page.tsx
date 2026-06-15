@@ -26,6 +26,13 @@ interface FormData {
   Super_min: boolean
   Class_min: boolean
   Weapons_min: boolean
+  // "Ignore" flags: don't-care dump stats (mutually exclusive with the matching _min lock)
+  Health_ignore: boolean
+  Melee_ignore: boolean
+  Grenade_ignore: boolean
+  Super_ignore: boolean
+  Class_ignore: boolean
+  Weapons_ignore: boolean
   allow_tuned: boolean
   use_class_item_exotic: boolean
   exotic_perk1?: string
@@ -50,6 +57,8 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fragmentSelection, setFragmentSelection] = useState<FragmentSelection | null>(null)
+  // Stats the last solve was told to ignore — so results can flag them as "don't care".
+  const [ignoredStats, setIgnoredStats] = useState<string[]>([])
   const solutionsRef = useRef<HTMLDivElement>(null)
 
   // Restore solutions, desiredStats, and fragment selection from sessionStorage on mount
@@ -57,17 +66,19 @@ export default function Home() {
     const saved = readJSON<{
       solutions?: Solution[]
       desiredStats?: Record<string, number>
+      ignoredStats?: string[]
       fragmentSelection?: FragmentSelection | null
     } | null>('session', STORAGE_KEYS.mainState, null)
     if (saved?.solutions) setSolutions(saved.solutions)
     if (saved?.desiredStats) setDesiredStats(saved.desiredStats)
+    if (saved?.ignoredStats) setIgnoredStats(saved.ignoredStats)
     if (saved?.fragmentSelection) setFragmentSelection(saved.fragmentSelection)
   }, [])
 
   // Save solutions, desiredStats, and fragment selection to sessionStorage whenever they change
   useEffect(() => {
-    writeJSON('session', STORAGE_KEYS.mainState, { solutions, desiredStats, fragmentSelection })
-  }, [solutions, desiredStats, fragmentSelection])
+    writeJSON('session', STORAGE_KEYS.mainState, { solutions, desiredStats, ignoredStats, fragmentSelection })
+  }, [solutions, desiredStats, ignoredStats, fragmentSelection])
 
   const handleSubmit = async (data: FormData) => {
     setIsLoading(true)
@@ -88,6 +99,7 @@ export default function Home() {
       use_fragments, fragment_subclass, fragments,
       use_locked_pieces, locked_pieces,
       Health_min, Melee_min, Grenade_min, Super_min, Class_min, Weapons_min,
+      Health_ignore, Melee_ignore, Grenade_ignore, Super_ignore, Class_ignore, Weapons_ignore,
       ...statValues
     } = data
     setDesiredStats(statValues)
@@ -101,14 +113,28 @@ export default function Home() {
         ? [exotic_perk1, exotic_perk2]
         : undefined
 
-      // Prepare minimum constraints for backend
+      // Stats the user marked "ignore": free dump stats with no target, floor, or penalty.
+      const ignored_stats = [
+        Health_ignore && 'Health',
+        Melee_ignore && 'Melee',
+        Grenade_ignore && 'Grenade',
+        Super_ignore && 'Super',
+        Class_ignore && 'Class',
+        Weapons_ignore && 'Weapons',
+      ].filter(Boolean) as string[]
+      const isIgnored = (s: string) => ignored_stats.includes(s)
+      // Snapshot for the results panel so ignored stats render as "don't care".
+      setIgnoredStats(ignored_stats)
+
+      // Prepare minimum constraints for backend. An ignored stat never carries a floor
+      // (the UI keeps Min and Ignore exclusive; this is belt-and-suspenders).
       const minimum_constraints = {
-        Health: Health_min ? data.Health : null,
-        Melee: Melee_min ? data.Melee : null,
-        Grenade: Grenade_min ? data.Grenade : null,
-        Super: Super_min ? data.Super : null,
-        Class: Class_min ? data.Class : null,
-        Weapons: Weapons_min ? data.Weapons : null,
+        Health: Health_min && !isIgnored('Health') ? data.Health : null,
+        Melee: Melee_min && !isIgnored('Melee') ? data.Melee : null,
+        Grenade: Grenade_min && !isIgnored('Grenade') ? data.Grenade : null,
+        Super: Super_min && !isIgnored('Super') ? data.Super : null,
+        Class: Class_min && !isIgnored('Class') ? data.Class : null,
+        Weapons: Weapons_min && !isIgnored('Weapons') ? data.Weapons : null,
       }
 
       // Subclass fragments shift the player's baseline stats. The backend subtracts these
@@ -124,6 +150,7 @@ export default function Home() {
         ...data,
         exotic_perks,
         minimum_constraints,
+        ignored_stats,
         fragment_bonuses,
         locked_pieces: locked,
       }
@@ -202,6 +229,7 @@ export default function Home() {
             <SolutionDisplay
               solutions={solutions}
               desiredStats={desiredStats}
+              ignoredStats={ignoredStats}
               fragments={fragmentSelection}
               isLoading={isLoading}
               error={error}

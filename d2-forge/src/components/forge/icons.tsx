@@ -117,4 +117,10 @@ export const Icon = {
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   ),
+  ban: (p: IconProps) => (
+    <svg {...base} {...p}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m4.9 4.9 14.2 14.2" />
+    </svg>
+  ),
 }

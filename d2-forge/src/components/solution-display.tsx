@@ -14,12 +14,13 @@ import { readJSON, writeJSON, parsePiece } from '@/lib/storage'
 interface SolutionDisplayProps {
   solutions: Solution[]
   desiredStats: Record<string, number>
+  ignoredStats?: string[]
   fragments?: FragmentSelection | null
   isLoading?: boolean
   error?: string | null
 }
 
-export function SolutionDisplay({ solutions, desiredStats, fragments = null, isLoading = false, error = null }: SolutionDisplayProps) {
+export function SolutionDisplay({ solutions, desiredStats, ignoredStats = [], fragments = null, isLoading = false, error = null }: SolutionDisplayProps) {
   // Load saved solution states from sessionStorage synchronously for initial render
   const getInitialButtonStates = (): Record<number, 'idle' | 'editing' | 'saving' | 'saved'> => {
     const savedSolutions = new Set(readJSON<string[]>('session', STORAGE_KEYS.savedSolutions, []))
@@ -433,14 +434,16 @@ export function SolutionDisplay({ solutions, desiredStats, fragments = null, isL
                     <tbody>
                       {STAT_NAMES.map((statName, statIndex) => {
                         const actual = solution.actualStats![statIndex]
+                        const ignored = ignoredStats.includes(statName)
                         const desired = desiredStats[statName]
                         const diff = actual - desired
                         const cls = diff < 0 ? 'diff-under' : 'diff-over'
                         return (
-                          <tr key={statName}>
+                          <tr key={statName} className={ignored ? 'is-ignored' : undefined}>
                             <td>
                               <span className="nm">
                                 <StatIcon stat={statName} size={15} /> {statName}
+                                {ignored && <span className="ignored-tag">Ignored</span>}
                               </span>
                             </td>
                             <td className="bar-cell">
@@ -449,10 +452,10 @@ export function SolutionDisplay({ solutions, desiredStats, fragments = null, isL
                               </div>
                             </td>
                             <td>{actual}</td>
-                            <td className="subtle">{desired}</td>
-                            <td className={cls}>
-                              {diff > 0 ? '+' : ''}
-                              {diff}
+                            {/* Ignored stats have no target, so the desired/Δ comparison is meaningless. */}
+                            <td className="subtle">{ignored ? '—' : desired}</td>
+                            <td className={ignored ? 'subtle' : cls}>
+                              {ignored ? '—' : `${diff > 0 ? '+' : ''}${diff}`}
                             </td>
                           </tr>
                         )

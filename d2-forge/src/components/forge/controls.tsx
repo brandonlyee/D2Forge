@@ -9,20 +9,27 @@ export function ForgeSwitch({
   checked,
   onChange,
   ariaLabel,
+  disabled = false,
 }: {
   checked: boolean
   onChange: (v: boolean) => void
   ariaLabel?: string
+  disabled?: boolean
 }) {
   return (
     <span
       role="switch"
       aria-checked={checked}
       aria-label={ariaLabel}
-      tabIndex={0}
-      className={"switch" + (checked ? " on" : "")}
-      onClick={() => onChange(!checked)}
+      aria-disabled={disabled}
+      tabIndex={disabled ? -1 : 0}
+      className={"switch" + (checked ? " on" : "") + (disabled ? " disabled" : "")}
+      onClick={() => {
+        if (disabled) return
+        onChange(!checked)
+      }}
       onKeyDown={(e) => {
+        if (disabled) return
         if (e.key === " " || e.key === "Enter") {
           e.preventDefault()
           onChange(!checked)
@@ -41,6 +48,7 @@ export function ForgeSlider({
   step = 5,
   floor = null,
   locked = false,
+  disabled = false,
 }: {
   value: number
   onChange: (v: number) => void
@@ -49,6 +57,7 @@ export function ForgeSlider({
   step?: number
   floor?: number | null
   locked?: boolean
+  disabled?: boolean
 }) {
   const ref = React.useRef<HTMLDivElement>(null)
   const [drag, setDrag] = React.useState(false)
@@ -84,6 +93,7 @@ export function ForgeSlider({
   }, [drag, setFromClientX])
 
   const onKey = (e: React.KeyboardEvent) => {
+    if (disabled) return
     if (e.key === "ArrowRight" || e.key === "ArrowUp") {
       onChange(Math.min(max, value + step))
       e.preventDefault()
@@ -96,9 +106,10 @@ export function ForgeSlider({
 
   return (
     <div
-      className={"slider" + (locked ? " locked" : "")}
+      className={"slider" + (locked ? " locked" : "") + (disabled ? " disabled" : "")}
       ref={ref}
       onPointerDown={(e) => {
+        if (disabled) return
         e.currentTarget.setPointerCapture?.(e.pointerId)
         setDrag(true)
         setFromClientX(e.clientX)
@@ -117,11 +128,12 @@ export function ForgeSlider({
       <div
         className={"thumb" + (drag ? " drag" : "")}
         style={{ left: pct + "%" }}
-        tabIndex={0}
+        tabIndex={disabled ? -1 : 0}
         role="slider"
         aria-valuenow={value}
         aria-valuemin={min}
         aria-valuemax={max}
+        aria-disabled={disabled}
         onKeyDown={onKey}
       />
     </div>
@@ -134,11 +146,13 @@ export function ForgeNumberField({
   onChange,
   min = 0,
   max = 200,
+  disabled = false,
 }: {
   value: number
   onChange: (v: number) => void
   min?: number
   max?: number
+  disabled?: boolean
 }) {
   return (
     <input
@@ -147,6 +161,7 @@ export function ForgeNumberField({
       inputMode="numeric"
       pattern="[0-9]*"
       value={value}
+      disabled={disabled}
       onChange={(e) => {
         const digits = e.target.value.replace(/[^0-9]/g, "")
         const v = digits === "" ? 0 : parseInt(digits, 10)
