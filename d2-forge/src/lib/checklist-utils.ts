@@ -3,6 +3,7 @@ import {
   ChecklistArmorItem,
   ChecklistModItem,
   ChecklistTuningItem,
+  ArmorSlot,
   SlotsUsed
 } from '@/types/checklist'
 import type { Solution } from '@/types/solution'
@@ -26,6 +27,11 @@ export function expandSolutionToChecklist(
   const modItems: ChecklistModItem[] = []
   const tuningItems: ChecklistTuningItem[] = []
 
+  // User-locked pieces carry their concrete gear slot (helmet/arms/chest/legs/class). They're
+  // already owned, so they're pre-assigned to that exact slot and pre-completed below.
+  const slotsUsed: SlotsUsed = { helmet: null, arms: null, chest: null, legs: null, class: null }
+  const GEAR_SLOTS: ArmorSlot[] = ['helmet', 'arms', 'chest', 'legs', 'class']
+
   // Expand armor pieces from grouped format to individual items
   Object.entries(solution.pieces).forEach(([pieceKey, count]) => {
     const piece = parsePiece(pieceKey)
@@ -35,6 +41,11 @@ export function expandSolutionToChecklist(
     for (let i = 0; i < count; i++) {
       const isExotic = piece.arch.toLowerCase().includes('exotic')
       const isExoticClassItem = piece.arch.toLowerCase().includes('exotic class item')
+      const lockedSlot = (GEAR_SLOTS as string[]).includes(piece.slot ?? '')
+        ? (piece.slot as ArmorSlot)
+        : null
+      const isLocked = lockedSlot !== null
+      const isClassItem = lockedSlot === 'class'
 
       // Every piece — including the Exotic Class Item — has an open tuning slot.
       // Backend "none"/"tuned" both mean the slot can take a +5/-5 mod, so surface
@@ -42,16 +53,26 @@ export function expandSolutionToChecklist(
       const tuningMode: 'flexible' | 'balanced' | 'none' =
         piece.tuning_mode === 'balanced' ? 'balanced' : 'flexible'
 
+      const itemId = generateId()
+
+      // Pre-assign owned pieces to their exact slot and mark them acquired.
+      const assignedSlot: ArmorSlot | null =
+        lockedSlot && !slotsUsed[lockedSlot] ? lockedSlot : null
+      if (assignedSlot) slotsUsed[assignedSlot] = itemId
+
       armorItems.push({
-        id: generateId(),
+        id: itemId,
         archetype: piece.arch,
         tertiary: piece.tertiary,
         isExotic,
         isExoticClassItem,
+        isLocked,
+        lockedSlot,
+        isClassItem,
         tuningMode,
-        assignedSlot: null,
+        assignedSlot,
         selectedTuning: null,
-        isCompleted: false
+        isCompleted: isLocked
       })
 
       // Add mod requirement for this piece
@@ -111,13 +132,7 @@ export function expandSolutionToChecklist(
     armorItems,
     modItems,
     tuningItems,
-    slotsUsed: {
-      helmet: null,
-      arms: null,
-      chest: null,
-      legs: null,
-      class: null
-    },
+    slotsUsed,
     createdAt: new Date().toISOString(),
     lastUpdated: new Date().toISOString()
   }
@@ -125,13 +140,23 @@ export function expandSolutionToChecklist(
 
 // Get available slots for an armor item
 export function getAvailableSlots(
-  item: ChecklistArmorItem, 
+  item: ChecklistArmorItem,
   slotsUsed: SlotsUsed
 ): string[] {
-  if (item.isExoticClassItem) {
-    return slotsUsed.class ? [] : ['class']
+  // User-locked (owned) pieces are pinned to the exact slot they were specified for and can't
+  // be moved — regardless of which slot that is (helmet/arms/chest/legs/class). Pin to the
+  // persisted lockedSlot so it stays fixed even if the piece is toggled off and back on
+  // (falling back to assignedSlot for checklists saved before lockedSlot existed).
+  const pinnedSlot = item.isLocked ? item.lockedSlot ?? item.assignedSlot : null
+  if (pinnedSlot) {
+    return [pinnedSlot]
   }
-  
+
+  // Both exotic and locked legendary class items belong in the class slot.
+  if (item.isExoticClassItem || item.isClassItem) {
+    return slotsUsed.class && slotsUsed.class !== item.id ? [] : ['class']
+  }
+
   if (item.isExotic) {
     // Regular exotics can't go in class slot
     return (['helmet', 'arms', 'chest', 'legs'] as const).filter(

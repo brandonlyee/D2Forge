@@ -106,4 +106,15 @@ export const Icon = {
       <path d="m3.3 7 8.7 5 8.7-5M12 22V12" />
     </svg>
   ),
+  plus: (p: IconProps) => (
+    <svg {...base} strokeWidth={2.2} {...p}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  ),
+  lock2: (p: IconProps) => (
+    <svg {...base} {...p}>
+      <rect x="3" y="11" width="18" height="11" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  ),
 }

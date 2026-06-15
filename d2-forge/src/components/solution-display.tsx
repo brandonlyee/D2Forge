@@ -6,6 +6,7 @@ import { FragmentList } from '@/components/fragment-list'
 import { Logo, Icon } from '@/components/forge/icons'
 import { expandSolutionToChecklist, saveChecklist } from '@/lib/checklist-utils'
 import type { FragmentSelection } from '@/lib/fragments'
+import { GEAR_SLOTS, GEAR_SLOT_LABEL, type GearSlot } from '@/lib/archetypes'
 import type { PieceType, Solution } from '@/types/solution'
 import { STAT_NAMES, STORAGE_KEYS } from '@/lib/constants'
 import { readJSON, writeJSON, parsePiece } from '@/lib/storage'
@@ -212,6 +213,8 @@ export function SolutionDisplay({ solutions, desiredStats, fragments = null, isL
             arch: piece.arch,
             tertiary: piece.tertiary,
             tuning_mode: piece.tuning_mode === 'tuned' ? 'flexible' : piece.tuning_mode,
+            // Keep owned (locked) pieces in their own groups so they render with an "Owned" tag.
+            slot: piece.slot ?? null,
           })
           if (!groupedPieces[groupKey]) groupedPieces[groupKey] = { pieces: [], totalCount: 0 }
           groupedPieces[groupKey].pieces.push({ piece, count })
@@ -300,7 +303,12 @@ export function SolutionDisplay({ solutions, desiredStats, fragments = null, isL
                   if (group.pieces.length === 0) return null
                   const firstPiece = group.pieces[0].piece
                   const isExotic = firstPiece.arch.toLowerCase().includes('exotic')
-                  const isClassItem = firstPiece.arch.toLowerCase().includes('class item')
+                  const lockedSlot = GEAR_SLOTS.includes((firstPiece.slot ?? '') as GearSlot)
+                    ? (firstPiece.slot as GearSlot)
+                    : null
+                  const isLocked = lockedSlot !== null
+                  const isClassItem =
+                    firstPiece.arch.toLowerCase().includes('class item') || lockedSlot === 'class'
                   // Every piece (including the Exotic Class Item) has an open tuning slot.
                   const isFlexible =
                     firstPiece.tuning_mode === 'tuned' || firstPiece.tuning_mode === 'none'
@@ -315,24 +323,40 @@ export function SolutionDisplay({ solutions, desiredStats, fragments = null, isL
                   } else if (isFlexible) {
                     tag = 'flex'
                     tagText = 'Flexible'
-                    tuningDesc = 'Accepts any ±5 tuning mod'
+                    tuningDesc = isLocked ? 'Tuning honored on owned piece' : 'Accepts any ±5 tuning mod'
                   }
 
+                  // Owned pieces show their concrete slot (e.g. "Demolitionist Helmet"); farmed
+                  // pieces keep the existing "Armor" label.
+                  const nameSuffix = isExotic
+                    ? ''
+                    : lockedSlot
+                    ? ` ${GEAR_SLOT_LABEL[lockedSlot]}`
+                    : ' Armor'
+
                   return (
-                    <div className={'piece' + (isExotic ? ' is-exotic' : '')} key={groupIndex}>
+                    <div
+                      className={'piece' + (isExotic ? ' is-exotic' : '') + (isLocked ? ' is-locked' : '')}
+                      key={groupIndex}
+                    >
                       <div className="pico">
                         <StatIcon stat={isClassItem ? 'Class' : firstPiece.arch.replace('Exotic ', '')} size={17} />
                       </div>
                       <div className="pmeta">
                         <div className="pname">
                           <span className="ct">{group.totalCount}×</span> {firstPiece.arch}
-                          {isExotic ? '' : ' Armor'}
+                          {nameSuffix}
                         </div>
                         <div className="pdesc">
                           Tertiary: <StatIcon stat={firstPiece.tertiary} size={13} /> {firstPiece.tertiary} · {tuningDesc}
                         </div>
                       </div>
                       <span className="pspacer" />
+                      {isLocked && (
+                        <span className="tag owned">
+                          <Icon.lock2 style={{ width: 11, height: 11 }} /> Owned
+                        </span>
+                      )}
                       <span className={'tag ' + tag}>{tagText}</span>
                     </div>
                   )

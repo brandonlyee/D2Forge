@@ -377,6 +377,12 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
 .opt-row .opt-desc { margin-top: 5px; font-size: 12px; line-height: 1.45; color: var(--muted-foreground); }
 .opt-row .switch { flex: 0 0 auto; }
 .opt-nest { margin-left: 14px; padding-left: 14px; border-left: 1.5px solid var(--border); }
+.beta-tag {
+  margin-left: 8px; vertical-align: 1px; font-family: var(--font-num); font-size: 9.5px;
+  font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 2px 6px;
+  border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent);
+  border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
+}
 
 /* ============================================================================
    TOTAL BAR
@@ -449,6 +455,8 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
 .tag.balanced { background: var(--primary-soft); color: var(--primary); border-color: color-mix(in oklab, var(--primary) 38%, transparent); }
 .tag.flex     { background: var(--secondary);    color: var(--muted-foreground); border-color: var(--border-strong); }
 .tag.plain    { background: transparent;         color: var(--muted-foreground); border-color: var(--border-strong); }
+.tag.owned    { background: var(--accent-soft);  color: var(--accent);  border-color: color-mix(in oklab, var(--accent) 40%, transparent); }
+.tag.owned svg { width: 11px; height: 11px; }
 
 /* ============================================================================
    SELECT (custom dropdown)
@@ -459,6 +467,11 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
    past the panel), collapsing to one column on small phones for full names. */
 .perk-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 @media (max-width: 480px) { .perk-grid { grid-template-columns: 1fr; } }
+
+/* Locked ("build around these") pieces */
+.locked-list { display: flex; flex-direction: column; gap: 12px; }
+.locked-card { padding: 12px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); }
+.locked-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .select-trigger {
   appearance: none; -webkit-appearance: none;
   width: 100%; display: flex; align-items: center; gap: 8px; justify-content: space-between;
@@ -513,6 +526,8 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; appe
 .piece { display: flex; align-items: center; gap: 12px; padding: 11px 13px; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); }
 .piece + .piece { margin-top: 8px; }
 .piece.is-exotic { border-color: color-mix(in oklab, var(--gold) 35%, var(--border)); background: color-mix(in oklab, var(--gold-soft) 50%, var(--surface)); }
+.piece.is-locked { border-color: color-mix(in oklab, var(--accent) 32%, var(--border)); background: color-mix(in oklab, var(--accent-soft) 40%, var(--surface)); }
+.piece.is-locked .pname .ct { color: var(--accent); }
 .piece .pico { width: 30px; height: 30px; border-radius: var(--r-sm); background: var(--card); border: 1px solid var(--border); display: grid; place-items: center; flex: 0 0 30px; }
 .piece .pico img { width: 17px; height: 17px; }
 .piece .pmeta { min-width: 0; }

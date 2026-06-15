@@ -8,6 +8,13 @@ export interface ChecklistArmorItem {
   tertiary: string
   isExotic: boolean
   isExoticClassItem: boolean
+  // A user-locked piece the player already owns: pre-assigned to a slot and pre-completed.
+  isLocked: boolean
+  // The exact gear slot a locked piece is pinned to (it can never be moved off it). null for
+  // solver-chosen pieces, which the user assigns freely.
+  lockedSlot: ArmorSlot | null
+  // True when this piece belongs in the class slot (a locked legendary class item).
+  isClassItem: boolean
   tuningMode: 'flexible' | 'balanced' | 'none'
   assignedSlot: ArmorSlot | null
   selectedTuning: string | null

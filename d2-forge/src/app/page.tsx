@@ -10,6 +10,7 @@ import type { Solution } from '@/types/solution'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { readJSON, writeJSON } from '@/lib/storage'
 import { computeFragmentBonuses, buildFragmentSelection, type FragmentSelection } from '@/lib/fragments'
+import { lockedPieceToRequest, type LockedPiece } from '@/lib/archetypes'
 
 interface FormData {
   Health: number
@@ -32,6 +33,8 @@ interface FormData {
   use_fragments: boolean
   fragment_subclass?: string
   fragments: string[]
+  use_locked_pieces: boolean
+  locked_pieces: LockedPiece[]
 }
 
 export default function Home() {
@@ -83,6 +86,7 @@ export default function Home() {
     const {
       allow_tuned, use_class_item_exotic, exotic_perk1, exotic_perk2,
       use_fragments, fragment_subclass, fragments,
+      use_locked_pieces, locked_pieces,
       Health_min, Melee_min, Grenade_min, Super_min, Class_min, Weapons_min,
       ...statValues
     } = data
@@ -112,11 +116,16 @@ export default function Home() {
       // reported stats so the results compare true totals against what the user asked for.
       const fragment_bonuses = computeFragmentBonuses(use_fragments ? fragments : [])
 
+      // Locked pieces the solver must build around (snake_case for the backend). Omitted when
+      // the toggle is off so empty rows never constrain the solve.
+      const locked = use_locked_pieces ? (locked_pieces || []).map(lockedPieceToRequest) : []
+
       const requestData = {
         ...data,
         exotic_perks,
         minimum_constraints,
         fragment_bonuses,
+        locked_pieces: locked,
       }
 
       // Call our Vercel Function directly
